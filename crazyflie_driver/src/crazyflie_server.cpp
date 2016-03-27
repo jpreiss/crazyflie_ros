@@ -228,31 +228,31 @@ private:
       ROS_INFO("Requesting Logging variables...");
       m_cf.requestLogToc();
 
-      std::function<void(logImu*)> cb = std::bind(&CrazyflieROS::onImuData, this, std::placeholders::_1);
+      // std::function<void(logImu*)> cb = std::bind(&CrazyflieROS::onImuData, this, std::placeholders::_1);
 
-      logBlockImu.reset(new LogBlock<logImu>(
-        &m_cf,{
-          {"acc", "x"},
-          {"acc", "y"},
-          {"acc", "z"},
-          {"gyro", "x"},
-          {"gyro", "y"},
-          {"gyro", "z"},
-        }, cb));
-      logBlockImu->start(1); // 10ms
+      // logBlockImu.reset(new LogBlock<logImu>(
+      //   &m_cf,{
+      //     {"acc", "x"},
+      //     {"acc", "y"},
+      //     {"acc", "z"},
+      //     {"gyro", "x"},
+      //     {"gyro", "y"},
+      //     {"gyro", "z"},
+      //   }, cb));
+      // logBlockImu->start(1); // 10ms
 
-      std::function<void(log2*)> cb2 = std::bind(&CrazyflieROS::onLog2Data, this, std::placeholders::_1);
+      // std::function<void(log2*)> cb2 = std::bind(&CrazyflieROS::onLog2Data, this, std::placeholders::_1);
 
-      logBlock2.reset(new LogBlock<log2>(
-        &m_cf,{
-          {"mag", "x"},
-          {"mag", "y"},
-          {"mag", "z"},
-          {"baro", "temp"},
-          {"baro", "pressure"},
-          {"pm", "vbat"},
-        }, cb2));
-      logBlock2->start(10); // 100ms
+      // logBlock2.reset(new LogBlock<log2>(
+      //   &m_cf,{
+      //     {"mag", "x"},
+      //     {"mag", "y"},
+      //     {"mag", "z"},
+      //     {"baro", "temp"},
+      //     {"baro", "pressure"},
+      //     {"pm", "vbat"},
+      //   }, cb2));
+      // logBlock2->start(10); // 100ms
 
       // custom log blocks
       size_t i = 0;

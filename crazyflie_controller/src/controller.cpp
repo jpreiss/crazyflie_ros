@@ -3,6 +3,11 @@
 #include <std_srvs/Empty.h>
 #include <geometry_msgs/Twist.h>
 
+#include <crazyflie_controller/ExecuteTrajectoryAction.h>
+#include <actionlib/server/simple_action_server.h>
+
+#include <crazyflie_driver/GenericLogData.h>
+
 
 #include "pid.hpp"
 
@@ -37,10 +42,12 @@ public:
             "yaw",
             true)
         , m_state(Idle)
-        , m_goal()
-        , m_subscribeGoal()
+        , m_subscribeStabilizer()
+        // , m_goal()
+        // , m_subscribeGoal()
         , m_serviceTakeoff()
         , m_serviceLand()
+        , m_actionServerExecuteTrajectory(nullptr)
         , m_thrust(0)
         , m_kp(get(n, "PIDs/Body/kp"))
         , m_kd(get(n, "PIDs/Body/kd"))
@@ -49,12 +56,29 @@ public:
         , m_current_r_error_integration(0,0,0)
         , m_massThrust(get(n, "MassThrust"))
         , m_maxAngle(get(n, "MaxAngle"))
+        , m_roll(0)
+        , m_pitch(0)
+        , m_yaw(0)
     {
         ros::NodeHandle nh;
         m_pubNav = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
-        m_subscribeGoal = nh.subscribe("goal", 1, &Controller::goalChanged, this);
+        // m_subscribeGoal = nh.subscribe("goal", 1, &Controller::goalChanged, this);
+        // ToDo switch to actions!
         m_serviceTakeoff = nh.advertiseService("takeoff", &Controller::takeoff, this);
         m_serviceLand = nh.advertiseService("land", &Controller::land, this);
+        // m_serviceGoTo = nh.advertiseService("go_to", &Controller::go_to, this);
+
+        m_subscribeStabilizer = nh.subscribe("/crazyflie/stabilizer", 1, &Controller::stabilizerChanged, this);
+
+        m_actionServerExecuteTrajectory = new actionlib::SimpleActionServer<crazyflie_controller::ExecuteTrajectoryAction>(
+            nh, "execute_trajectory",
+            std::bind(&Controller::executeTrajectory, this, std::placeholders::_1),
+            true);
+    }
+
+    ~Controller()
+    {
+        delete m_actionServerExecuteTrajectory;
     }
 
     void run(double frequency)
@@ -65,10 +89,18 @@ public:
     }
 
 private:
-    void goalChanged(
-        const geometry_msgs::PoseStamped::ConstPtr& msg)
+    // void goalChanged(
+    //     const geometry_msgs::PoseStamped::ConstPtr& msg)
+    // {
+    //     m_goal = *msg;
+    // }
+
+    void stabilizerChanged(
+        const crazyflie_driver::GenericLogData::ConstPtr& msg)
     {
-        m_goal = *msg;
+        m_roll = -msg->values[0] / 180 * M_PI;
+        m_pitch = msg->values[1] / 180 * M_PI;
+        m_yaw = msg->values[2] / 180 * M_PI;
     }
 
     bool takeoff(
@@ -89,6 +121,31 @@ private:
         m_state = Landing;
 
         return true;
+    }
+
+    bool executeTrajectory(
+        const crazyflie_controller::ExecuteTrajectoryGoalConstPtr& goal)
+    {
+        ROS_INFO("execute trajectory requested!");
+
+        m_trajectory = goal->trajectory;
+        // m_startTime = ros::Time::now();
+
+        // m_actionServerExecuteTrajectory->setSucceeded();
+    }
+
+    void getCurrentTrajectoryPoint(
+        crazyflie_controller::QuadcopterTrajectoryPoint& result)
+    {
+        // TODO: we could also linearely interpolate here!
+        ros::Duration d = ros::Time::now() - m_trajectory.header.stamp;
+        for (auto& pt : m_trajectory.points) {
+            if (pt.time_from_start > d) {
+                result = pt;
+                return;
+            }
+        }
+        result = m_trajectory.points.back();
     }
 
     void getTransform(
@@ -120,6 +177,11 @@ private:
                     pidReset();
                     m_state = Automatic;
                     m_thrust = 0;
+                    m_trajectory.header.stamp = ros::Time::now();
+                    m_trajectory.points.clear();
+                    crazyflie_controller::QuadcopterTrajectoryPoint pt;
+                    pt.position.z = 0.5;
+                    m_trajectory.points.push_back(pt);
                 }
                 else
                 {
@@ -133,7 +195,13 @@ private:
             break;
         case Landing:
             {
-                m_goal.pose.position.z = 0.05;
+                // m_goal.pose.position.z = 0.05;
+                m_trajectory.header.stamp = ros::Time::now();
+                m_trajectory.points.clear();
+                crazyflie_controller::QuadcopterTrajectoryPoint pt;
+                pt.position.z = 0.05;
+                m_trajectory.points.push_back(pt);
+
                 tf::StampedTransform transform;
                 m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
                 if (transform.getOrigin().z() <= 0.05) {
@@ -152,25 +220,55 @@ private:
                 tf::Vector3 current_velocity = (position - m_oldPosition) / dt;
                 m_oldPosition = position;
 
-                tf::Vector3 current_z_axis = transform.getRotation().getAxis();
-                current_z_axis /= transform.getRotation().length();
+                // tf::Quaternion q;
+                // //q.setEuler(-m_pitch, m_roll, m_yaw);//m_yaw, m_roll, m_pitch);
+                // q.setEuler(m_yaw, m_roll, -m_pitch);
+                // tf::Transform t(q);
+                // tf::Vector3 current_z_axis = t(tf::Vector3(0, 0, 1));
+                tf::Vector3 current_z_axis( -sin(m_pitch)*cos(m_roll),
+                                            sin(m_roll),
+                                            cos(m_pitch)*cos(m_roll));
+
+                // q.setRPY(m_pitch, m_roll, m_yaw);
+
+                // tf::Vector3 current_z_axis = q.getAxis().normalized();//transform.getRotation().getAxis();
+                // // current_z_axis.normalize();
+                // if (current_z_axis[2] < 0) {
+                //     current_z_axis *= -1;
+                // }
+
+                ROS_INFO("%f, %f, %f", current_z_axis[0], current_z_axis[1], current_z_axis[2]);
+                //break;
+
+                crazyflie_controller::QuadcopterTrajectoryPoint trajectoryPoint;
+                getCurrentTrajectoryPoint(trajectoryPoint);
+
+
+                // ROS_INFO("%f", position[2]);
 
                 tf::Vector3 target_position(
-                    m_goal.pose.position.x,
-                    m_goal.pose.position.y,
-                    m_goal.pose.position.z);
+                    trajectoryPoint.position.x,
+                    trajectoryPoint.position.y,
+                    trajectoryPoint.position.z);
 
-                tf::Quaternion target_quaternion(
-                    m_goal.pose.orientation.x,
-                    m_goal.pose.orientation.y,
-                    m_goal.pose.orientation.z,
-                    m_goal.pose.orientation.w);
+                tf::Vector3 target_velocity(
+                    trajectoryPoint.velocity.x,
+                    trajectoryPoint.velocity.y,
+                    trajectoryPoint.velocity.z);
 
-                tfScalar target_euler_roll, target_euler_pitch, target_euler_yaw;
-                tf::Matrix3x3(target_quaternion).getRPY(
-                    target_euler_roll,
-                    target_euler_pitch,
-                    target_euler_yaw);
+                tfScalar target_euler_yaw = trajectoryPoint.yaw;
+
+                // tf::Quaternion target_quaternion(
+                //     m_goal.pose.orientation.x,
+                //     m_goal.pose.orientation.y,
+                //     m_goal.pose.orientation.z,
+                //     m_goal.pose.orientation.w);
+
+                // tfScalar target_euler_roll, target_euler_pitch, target_euler_yaw;
+                // tf::Matrix3x3(target_quaternion).getRPY(
+                //     target_euler_roll,
+                //     target_euler_pitch,
+                //     target_euler_yaw);
 
                 tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
                 tf::Matrix3x3(transform.getRotation()).getRPY(
@@ -186,11 +284,11 @@ private:
                     m_current_r_error_integration = 6.0 * m_current_r_error_integration.normalized();
                 }
 
-                double r_error_norm = current_r_error.length();
-                tf::Vector3 target_velocity = 1.3 * (r_error_norm/5.0)*current_r_error_unit;
-                if (r_error_norm >= 5.0) {
-                    target_velocity = 1.3 * current_r_error_unit; // The velocity in the target position direction is 1 m/s
-                }
+                // double r_error_norm = current_r_error.length();
+                // target_velocity = 1.3 * (r_error_norm/5.0)*current_r_error_unit;
+                // if (r_error_norm >= 5.0) {
+                //     target_velocity = 1.3 * current_r_error_unit; // The velocity in the target position direction is 1 m/s
+                // }
 
                 // compute z-axis-desired
                 tf::Vector3 z_axis_desired = m_massThrust * tf::Vector3(0,0,1) + m_kp*current_r_error + m_kd*(target_velocity - current_velocity) + m_ki*m_current_r_error_integration;
@@ -210,6 +308,7 @@ private:
 
                 // control
                 double thrust = z_axis_desired.dot(current_z_axis);
+                ROS_INFO("%f", thrust);
                 if (thrust < 0) {
                     thrust = 0;
                 }
@@ -221,16 +320,21 @@ private:
                 x_axis_desired.normalize();
                 tf::Vector3 y_axis_desired = z_axis_desired_unit.cross(x_axis_desired);
 
-                double pitch_angle = asin(-1.0*x_axis_desired.getZ()) * 180.0 / M_PI;
-                double yaw_angle = atan2(x_axis_desired.getY(), x_axis_desired.getX());
+                double pitch_angle = asin(x_axis_desired.getZ()) * 180.0 / M_PI;
+                double yaw_angle = target_euler_yaw;
+                // double yaw_angle = atan2(x_axis_desired.getY(), x_axis_desired.getX());
                 double roll_angle = atan2(y_axis_desired.getZ(), z_axis_desired_unit.getZ()) * 180.0 / M_PI;
+
+                // ROS_INFO("%f", pitch_angle);
+                // break;
 
                 geometry_msgs::Twist msg;
                 msg.linear.x = pitch_angle;
-                msg.linear.y = roll_angle;
+                msg.linear.y = -roll_angle;
                 msg.linear.z = thrust;
                 msg.angular.z = m_pidYaw.update(current_euler_yaw, yaw_angle);
                 m_pubNav.publish(msg);
+
 
             }
             break;
@@ -260,10 +364,12 @@ private:
     tf::TransformListener m_listener;
     PID m_pidYaw;
     State m_state;
-    geometry_msgs::PoseStamped m_goal;
-    ros::Subscriber m_subscribeGoal;
+    // geometry_msgs::PoseStamped m_goal;
+    // ros::Subscriber m_subscribeGoal;
+    ros::Subscriber m_subscribeStabilizer;
     ros::ServiceServer m_serviceTakeoff;
     ros::ServiceServer m_serviceLand;
+    actionlib::SimpleActionServer<crazyflie_controller::ExecuteTrajectoryAction>* m_actionServerExecuteTrajectory;
     float m_thrust;
 
     double m_kp;
@@ -273,6 +379,14 @@ private:
     tf::Vector3 m_current_r_error_integration;
     double m_massThrust;
     double m_maxAngle;
+
+    crazyflie_controller::QuadcopterTrajectory m_trajectory;
+
+    double m_roll;
+    double m_pitch;
+    double m_yaw;
+
+    // ros::time m_startTime;
 };
 
 int main(int argc, char **argv)

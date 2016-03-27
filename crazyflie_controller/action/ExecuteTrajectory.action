@@ -1,0 +1,8 @@
+# Define the goal
+QuadcopterTrajectory trajectory
+---
+# Define the result
+duration time_elapsed
+---
+# Define a feedback message
+duration time_elapsed
