@@ -1,7 +1,10 @@
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 #include <std_srvs/Empty.h>
 #include <geometry_msgs/Twist.h>
+
+#include <Eigen/Dense>
 
 #include <crazyflie_controller/ExecuteTrajectoryAction.h>
 #include <actionlib/server/simple_action_server.h>
@@ -158,7 +161,7 @@ private:
 
     void pidReset()
     {
-        m_current_r_error_integration = tf::Vector3(0,0,0);
+        m_current_r_error_integration = Eigen::Vector3d(0,0,0);
         m_pidYaw.reset();
     }
 
@@ -213,11 +216,15 @@ private:
             // intentional fall-thru
         case Automatic:
             {
-                tf::StampedTransform transform;
-                m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
+                tf::StampedTransform tf_transform;
+                m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), tf_transform);
 
-                tf::Vector3 position = transform.getOrigin();
-                tf::Vector3 current_velocity = (position - m_oldPosition) / dt;
+                // CURRENT STATES
+                Eigen::Affine3d transform;
+                tf::transformTFToEigen(tf_transform, transform);
+
+                Eigen::Vector3d position = transform.translation();
+                Eigen::Vector3d current_velocity = (position - m_oldPosition) / dt;
                 m_oldPosition = position;
 
                 // tf::Quaternion q;
@@ -225,7 +232,7 @@ private:
                 // q.setEuler(m_yaw, m_roll, -m_pitch);
                 // tf::Transform t(q);
                 // tf::Vector3 current_z_axis = t(tf::Vector3(0, 0, 1));
-                tf::Vector3 current_z_axis( -sin(m_pitch)*cos(m_roll),
+                Eigen::Vector3d current_z_axis( -sin(m_pitch)*cos(m_roll),
                                             sin(m_roll),
                                             cos(m_pitch)*cos(m_roll));
 
@@ -237,7 +244,7 @@ private:
                 //     current_z_axis *= -1;
                 // }
 
-                ROS_INFO("%f, %f, %f", current_z_axis[0], current_z_axis[1], current_z_axis[2]);
+                //ROS_INFO("%f, %f, %f", current_z_axis[0], current_z_axis[1], current_z_axis[2]);
                 //break;
 
                 crazyflie_controller::QuadcopterTrajectoryPoint trajectoryPoint;
@@ -246,17 +253,17 @@ private:
 
                 // ROS_INFO("%f", position[2]);
 
-                tf::Vector3 target_position(
+                Eigen::Vector3d target_position(
                     trajectoryPoint.position.x,
                     trajectoryPoint.position.y,
                     trajectoryPoint.position.z);
 
-                tf::Vector3 target_velocity(
+                Eigen::Vector3d target_velocity(
                     trajectoryPoint.velocity.x,
                     trajectoryPoint.velocity.y,
                     trajectoryPoint.velocity.z);
 
-                tfScalar target_euler_yaw = trajectoryPoint.yaw;
+                double target_euler_yaw = trajectoryPoint.yaw;
 
                 // tf::Quaternion target_quaternion(
                 //     m_goal.pose.orientation.x,
@@ -271,16 +278,16 @@ private:
                 //     target_euler_yaw);
 
                 tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
-                tf::Matrix3x3(transform.getRotation()).getRPY(
+                tf::Matrix3x3(tf_transform.getRotation()).getRPY(
                     current_euler_roll,
                     current_euler_pitch,
                     current_euler_yaw);
 
-                tf::Vector3 current_r_error = target_position - position;
-                tf::Vector3 current_r_error_unit = current_r_error.normalized();
+                Eigen::Vector3d current_r_error = target_position - position;
+                Eigen::Vector3d current_r_error_unit = current_r_error.normalized();
 
                 m_current_r_error_integration += current_r_error * dt;
-                if (m_current_r_error_integration.length() >= 6) {
+                if (m_current_r_error_integration.norm() >= 6) {
                     m_current_r_error_integration = 6.0 * m_current_r_error_integration.normalized();
                 }
 
@@ -291,8 +298,8 @@ private:
                 // }
 
                 // compute z-axis-desired
-                tf::Vector3 z_axis_desired = m_massThrust * tf::Vector3(0,0,1) + m_kp*current_r_error + m_kd*(target_velocity - current_velocity) + m_ki*m_current_r_error_integration;
-                double angle = acos(z_axis_desired.normalized().dot(tf::Vector3(0,0,1)));
+                Eigen::Vector3d z_axis_desired = m_massThrust * Eigen::Vector3d(0,0,1) + m_kp*current_r_error + m_kd*(target_velocity - current_velocity) + m_ki*m_current_r_error_integration;
+                double angle = acos(z_axis_desired.normalized().dot(Eigen::Vector3d(0,0,1)));
                 double kp = m_kp;
                 double kd = m_kd;
                 double ki = m_ki;
@@ -301,10 +308,10 @@ private:
                     kp *= 0.9;
                     kd *= 0.9;
                     ki *= 0.9;
-                    z_axis_desired = m_massThrust * tf::Vector3(0,0,1) + kp*current_r_error + kd*(target_velocity - current_velocity) + ki*m_current_r_error_integration;
-                    angle = acos(z_axis_desired.normalized().dot(tf::Vector3(0,0,1)));
+                    z_axis_desired = m_massThrust * Eigen::Vector3d(0,0,1) + kp*current_r_error + kd*(target_velocity - current_velocity) + ki*m_current_r_error_integration;
+                    angle = acos(z_axis_desired.normalized().dot(Eigen::Vector3d(0,0,1)));
                 }
-                tf::Vector3 z_axis_desired_unit = z_axis_desired.normalized();
+                Eigen::Vector3d z_axis_desired_unit = z_axis_desired.normalized();
 
                 // control
                 double thrust = z_axis_desired.dot(current_z_axis);
@@ -316,14 +323,14 @@ private:
                     thrust = 65536;
                 }
 
-                tf::Vector3 x_axis_desired = z_axis_desired_unit.cross(tf::Vector3(sin(target_euler_yaw), cos(target_euler_yaw), 0));
+                Eigen::Vector3d x_axis_desired = z_axis_desired_unit.cross(Eigen::Vector3d(sin(target_euler_yaw), cos(target_euler_yaw), 0));
                 x_axis_desired.normalize();
-                tf::Vector3 y_axis_desired = z_axis_desired_unit.cross(x_axis_desired);
+                Eigen::Vector3d y_axis_desired = z_axis_desired_unit.cross(x_axis_desired);
 
-                double pitch_angle = asin(x_axis_desired.getZ()) * 180.0 / M_PI;
+                double pitch_angle = asin(x_axis_desired[2]) * 180.0 / M_PI;
                 double yaw_angle = target_euler_yaw;
                 // double yaw_angle = atan2(x_axis_desired.getY(), x_axis_desired.getX());
-                double roll_angle = atan2(y_axis_desired.getZ(), z_axis_desired_unit.getZ()) * 180.0 / M_PI;
+                double roll_angle = atan2(y_axis_desired[2], z_axis_desired_unit[2]) * 180.0 / M_PI;
 
                 // ROS_INFO("%f", pitch_angle);
                 // break;
@@ -375,8 +382,8 @@ private:
     double m_kp;
     double m_kd;
     double m_ki;
-    tf::Vector3 m_oldPosition;
-    tf::Vector3 m_current_r_error_integration;
+    Eigen::Vector3d m_oldPosition;
+    Eigen::Vector3d m_current_r_error_integration;
     double m_massThrust;
     double m_maxAngle;
 

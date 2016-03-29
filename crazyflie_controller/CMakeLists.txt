@@ -7,12 +7,14 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   actionlib_msgs
   actionlib
+  tf_conversions
 )
 
 # Enable C++14
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 
 ## System dependencies are found with CMake's conventions
+find_package(Eigen3 REQUIRED)
 # find_package(Boost REQUIRED COMPONENTS system)
 
 
@@ -94,7 +96,7 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 ## Declare a cpp library
 # add_library(crazyflie_controller
