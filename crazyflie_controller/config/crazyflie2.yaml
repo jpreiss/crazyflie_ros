@@ -2,8 +2,8 @@ MassThrust: 40000
 MaxAngle: 0.4
 PIDs:
   Body:
-    kp: 30000.0
-    kd: 15000.0
+    kp: 28000.0
+    kd: 16000.0
     ki:  2000.0
   Yaw:
     kp: -100.0

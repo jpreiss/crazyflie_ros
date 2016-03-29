@@ -3,10 +3,12 @@
 <launch>
   <arg name="frame"/>
   <arg name="worldFrame" default="world"/>
+  <arg name="frequency" default="50"/>
 
   <node name="controller" pkg="crazyflie_controller" type="crazyflie_controller" output="screen">
     <param name="frame" value="$(arg frame)" />
     <param name="worldFrame" value="$(arg worldFrame)" />
+    <param name="frequency" value="$(arg frequency)" />
     <rosparam command="load" file="$(find crazyflie_controller)/config/crazyflie2.yaml" />
   </node>
 </launch>
