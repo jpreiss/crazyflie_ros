@@ -33,18 +33,21 @@ add_service_files(
   FILES
   AddCrazyflie.srv
   UpdateParams.srv
+  UploadTrajectory.srv
 )
 
 add_message_files(
   FILES
   LogBlock.msg
   GenericLogData.msg
+  QuadcopterTrajectoryPoint.msg
 )
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
    std_msgs
+   geometry_msgs
 )
 
 ###################################

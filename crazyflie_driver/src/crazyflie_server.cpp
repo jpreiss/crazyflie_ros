@@ -3,6 +3,7 @@
 #include "crazyflie_driver/LogBlock.h"
 #include "crazyflie_driver/GenericLogData.h"
 #include "crazyflie_driver/UpdateParams.h"
+#include "crazyflie_driver/UploadTrajectory.h"
 #include "std_srvs/Empty.h"
 #include "geometry_msgs/Twist.h"
 #include "sensor_msgs/Imu.h"
@@ -47,6 +48,7 @@ public:
     , m_logBlocks(log_blocks)
     , m_serviceEmergency()
     , m_serviceUpdateParams()
+    , m_serviceUploadTrajectory()
     , m_subscribeCmdVel()
     , m_pubImu()
     , m_pubTemp()
@@ -60,6 +62,7 @@ public:
     m_subscribeCmdVel = n.subscribe(tf_prefix + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
     m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
+    m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
 
     m_pubImu = n.advertise<sensor_msgs::Imu>(tf_prefix + "/imu", 10);
     m_pubTemp = n.advertise<sensor_msgs::Temperature>(tf_prefix + "/temperature", 10);
@@ -156,6 +159,27 @@ private:
         ROS_ERROR("Could not find param %s/%s", group.c_str(), name.c_str());
       }
     }
+    return true;
+  }
+
+  bool uploadTrajectory(
+    crazyflie_driver::UploadTrajectory::Request& req,
+    crazyflie_driver::UploadTrajectory::Response& res)
+  {
+    ROS_INFO("Upload trajectory");
+
+    m_cf.trajectoryReset();
+
+    for (auto& p : req.points) {
+      m_cf.trajectoryAdd(
+        p.position.x, p.position.y, p.position.z,
+        p.velocity.x, p.velocity.y, p.velocity.z,
+        p.yaw,
+        p.time_from_start.toSec() * 1000);
+    }
+
+    m_cf.trajectoryStart();
+
     return true;
   }
 
@@ -395,6 +419,7 @@ private:
 
   ros::ServiceServer m_serviceEmergency;
   ros::ServiceServer m_serviceUpdateParams;
+  ros::ServiceServer m_serviceUploadTrajectory;
   ros::Subscriber m_subscribeCmdVel;
   ros::Publisher m_pubImu;
   ros::Publisher m_pubTemp;

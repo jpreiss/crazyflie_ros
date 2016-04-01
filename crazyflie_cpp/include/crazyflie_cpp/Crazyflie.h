@@ -100,6 +100,14 @@ public:
     m_linkQualityCallback = cb;
   }
 
+  void trajectoryReset();
+  void trajectoryAdd(
+    float x, float y, float z,
+    float velocity_x, float velocity_y, float velocity_z,
+    float yaw,
+    uint16_t time_from_start);
+  void trajectoryStart();
+
 protected:
   void sendPacket(
     const uint8_t* data,
@@ -207,6 +215,10 @@ private:
 
   std::function<void(const crtpPlatformRSSIAck*)> m_emptyAckCallback;
   std::function<void(float)> m_linkQualityCallback;
+
+  uint16_t m_lastTrajectoryId;
+  int m_lastTrajectoryResponse;
+  int m_lastTrajectoryResponse2;
 
   template<typename T>
   friend class LogBlock;

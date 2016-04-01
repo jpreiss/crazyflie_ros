@@ -38,6 +38,9 @@ Crazyflie::Crazyflie(
   , m_paramValuesRequested()
   , m_emptyAckCallback(nullptr)
   , m_linkQualityCallback(nullptr)
+  , m_lastTrajectoryId(0)
+  , m_lastTrajectoryResponse(-1)
+  , m_lastTrajectoryResponse2(-1)
 {
   int datarate;
   int channel;
@@ -270,6 +273,53 @@ void Crazyflie::setParam(uint8_t id, const ParamValue& value) {
 
 }
 
+void Crazyflie::trajectoryReset()
+{
+  m_lastTrajectoryResponse = -1;
+  do {
+    crtpTrajectoryResetRequest request;
+    sendPacket((const uint8_t*)&request, sizeof(request));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  } while (m_lastTrajectoryResponse != 0);
+  m_lastTrajectoryId = 0;
+}
+
+void Crazyflie::trajectoryAdd(
+    float x, float y, float z,
+    float velocity_x, float velocity_y, float velocity_z,
+    float yaw,
+    uint16_t time_from_start)
+{
+  crtpTrajectoryAddRequest request;
+  request.id = m_lastTrajectoryId;
+  request.time_from_start = time_from_start;
+  request.x = x;
+  request.y = y;
+  request.z = z;
+  request.velocity_x = velocity_x;
+  request.velocity_y = velocity_y;
+  request.velocity_z = velocity_z;
+  request.yaw = (int16_t)(yaw * 1000.0);
+  std::cout << "yaw: " << request.yaw << std::endl;
+
+  m_lastTrajectoryResponse = -1;
+  do {
+    sendPacket((const uint8_t*)&request, sizeof(request));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId);
+  ++m_lastTrajectoryId;
+}
+
+void Crazyflie::trajectoryStart()
+{
+  m_lastTrajectoryResponse = -1;
+  do {
+    crtpTrajectoryStartRequest request;
+    sendPacket((const uint8_t*)&request, sizeof(request));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  } while (m_lastTrajectoryResponse != 2);
+}
+
 void Crazyflie::sendPacket(
   const uint8_t* data,
   uint32_t length)
@@ -394,6 +444,11 @@ void Crazyflie::handleAck(
     if (m_emptyAckCallback) {
       m_emptyAckCallback(r);
     }
+  }
+  else if (crtpTrajectoryResponse::match(result)) {
+    crtpTrajectoryResponse* r = (crtpTrajectoryResponse*)result.data;
+    m_lastTrajectoryResponse = r->command;
+    m_lastTrajectoryResponse2 = r->cmd1;
   }
   else {
     crtp* header = (crtp*)result.data;

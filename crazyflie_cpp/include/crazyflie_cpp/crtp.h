@@ -361,7 +361,65 @@ struct crtpLogDataResponse
     uint8_t data[28];
 } __attribute__((packed));
 
+// Port 14 (Trajectory)
 
+struct crtpTrajectoryResetRequest
+{
+  crtpTrajectoryResetRequest()
+    : header(14, 1)
+    , command(0)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+} __attribute__((packed));
+
+struct crtpTrajectoryAddRequest
+{
+  crtpTrajectoryAddRequest()
+    : header(14, 1)
+    , command(1)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+    uint8_t id;
+    uint16_t time_from_start; // ms; 0 marks the beginning of the execution
+    float x; // m
+    float y; // m
+    float z; // m
+    float velocity_x; // m/s
+    float velocity_y; // m/s
+    float velocity_z; // m/s
+    int16_t yaw; // rad * 1000
+} __attribute__((packed));
+
+struct crtpTrajectoryStartRequest
+{
+  crtpTrajectoryStartRequest()
+    : header(14, 1)
+    , command(2)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+} __attribute__((packed));
+
+struct crtpTrajectoryResponse
+{
+    static bool match(const Crazyradio::Ack& response) {
+      return response.size == 4
+        && crtp(response.data[0]) == crtp(14, 1);
+    }
+
+    const crtp header;
+    const uint8_t command;
+    const uint8_t cmd1;
+    const uint8_t result;
+} __attribute__((packed));
 
 // Port 13 (Platform)
 
