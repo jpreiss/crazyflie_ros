@@ -107,6 +107,13 @@ public:
     float yaw,
     uint16_t time_from_start);
   void trajectoryStart();
+  void setTrajectoryState(bool state);
+
+  void sendPositionExternal(
+    float x,
+    float y,
+    float z,
+    float yaw);
 
 protected:
   void sendPacket(

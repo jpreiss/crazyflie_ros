@@ -361,6 +361,26 @@ struct crtpLogDataResponse
     uint8_t data[28];
 } __attribute__((packed));
 
+// Port 11 (PosExt)
+
+struct crtpPosExt
+{
+  crtpPosExt(float x, float y, float z, float yaw)
+    : header(12, 1)
+    , x(x)
+    , y(y)
+    , z(z)
+    , yaw(yaw)
+    {
+    }
+
+    const crtp header;
+    float x; // m
+    float y; // m
+    float z; // m
+    float yaw; // deg
+} __attribute__((packed));
+
 // Port 14 (Trajectory)
 
 struct crtpTrajectoryResetRequest
@@ -406,6 +426,20 @@ struct crtpTrajectoryStartRequest
 
     const crtp header;
     const uint8_t command;
+} __attribute__((packed));
+
+struct crtpTrajectoryStateRequest
+{
+  crtpTrajectoryStateRequest(uint8_t state)
+    : header(14, 1)
+    , command(3)
+    , state(state)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+    const uint8_t state;
 } __attribute__((packed));
 
 struct crtpTrajectoryResponse

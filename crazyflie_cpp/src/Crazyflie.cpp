@@ -320,6 +320,26 @@ void Crazyflie::trajectoryStart()
   } while (m_lastTrajectoryResponse != 2);
 }
 
+void Crazyflie::setTrajectoryState(bool state)
+{
+  m_lastTrajectoryResponse = -1;
+  do {
+    crtpTrajectoryStateRequest request(state);
+    sendPacket((const uint8_t*)&request, sizeof(request));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  } while (m_lastTrajectoryResponse != 3 || m_lastTrajectoryResponse2 != state);
+}
+
+void Crazyflie::sendPositionExternal(
+  float x,
+  float y,
+  float z,
+  float yaw)
+{
+  crtpPosExt request(x, y, z, yaw);
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
 void Crazyflie::sendPacket(
   const uint8_t* data,
   uint32_t length)

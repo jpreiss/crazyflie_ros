@@ -49,6 +49,8 @@ public:
     , m_serviceEmergency()
     , m_serviceUpdateParams()
     , m_serviceUploadTrajectory()
+    , m_serviceStartMotors()
+    , m_serviceStopMotors()
     , m_subscribeCmdVel()
     , m_pubImu()
     , m_pubTemp()
@@ -63,6 +65,8 @@ public:
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
     m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
+    m_serviceStartMotors = n.advertiseService(tf_prefix + "/start_motors", &CrazyflieROS::startMotors, this);
+    m_serviceStopMotors = n.advertiseService(tf_prefix + "/stop_motors", &CrazyflieROS::stopMotors, this);
 
     m_pubImu = n.advertise<sensor_msgs::Imu>(tf_prefix + "/imu", 10);
     m_pubTemp = n.advertise<sensor_msgs::Temperature>(tf_prefix + "/temperature", 10);
@@ -179,6 +183,24 @@ private:
     }
 
     m_cf.trajectoryStart();
+
+    return true;
+  }
+
+  bool startMotors(
+    std_srvs::Empty::Request& req,
+    std_srvs::Empty::Response& res)
+  {
+    m_cf.setTrajectoryState(true);
+
+    return true;
+  }
+
+  bool stopMotors(
+    std_srvs::Empty::Request& req,
+    std_srvs::Empty::Response& res)
+  {
+    m_cf.setTrajectoryState(false);
 
     return true;
   }
@@ -313,10 +335,13 @@ private:
 
     while(!m_isEmergency) {
       // make sure we ping often enough to stream data out
-      if (m_enableLogging && !m_sentSetpoint) {
-        m_cf.sendPing();
-      }
-      m_sentSetpoint = false;
+      // if (m_enableLogging && !m_sentSetpoint) {
+      //   m_cf.sendPing();
+      // }
+      // m_sentSetpoint = false;
+
+      m_cf.sendPositionExternal(0, 1, 2, 3);
+
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
@@ -420,6 +445,8 @@ private:
   ros::ServiceServer m_serviceEmergency;
   ros::ServiceServer m_serviceUpdateParams;
   ros::ServiceServer m_serviceUploadTrajectory;
+  ros::ServiceServer m_serviceStartMotors;
+  ros::ServiceServer m_serviceStopMotors;
   ros::Subscriber m_subscribeCmdVel;
   ros::Publisher m_pubImu;
   ros::Publisher m_pubTemp;
