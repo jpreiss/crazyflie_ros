@@ -52,11 +52,11 @@ public:
 
   void logReset();
 
-  void sendSetpoint(
-    float roll,
-    float pitch,
-    float yawrate,
-    uint16_t thrust);
+  // void sendSetpoint(
+  //   float roll,
+  //   float pitch,
+  //   float yawrate,
+  //   uint16_t thrust);
 
   void sendPing();
 

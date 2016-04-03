@@ -58,10 +58,8 @@ public:
     , m_pubPressure()
     , m_pubBattery()
     , m_pubRssi()
-    , m_sentSetpoint(false)
   {
     ros::NodeHandle n;
-    m_subscribeCmdVel = n.subscribe(tf_prefix + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
     m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
@@ -205,20 +203,6 @@ private:
     return true;
   }
 
-  void cmdVelChanged(
-    const geometry_msgs::Twist::ConstPtr& msg)
-  {
-    if (!m_isEmergency) {
-      float roll = msg->linear.y + m_roll_trim;
-      float pitch = - (msg->linear.x + m_pitch_trim);
-      float yawrate = msg->angular.z;
-      uint16_t thrust = std::min<uint16_t>(std::max<float>(msg->linear.z, 0.0), 60000);
-
-      m_cf.sendSetpoint(roll, pitch, yawrate, thrust);
-      m_sentSetpoint = true;
-    }
-  }
-
   void run()
   {
     // m_cf.reboot();
@@ -328,28 +312,12 @@ private:
     std::chrono::duration<double> elapsedSeconds = end-start;
     ROS_INFO("Elapsed: %f s", elapsedSeconds.count());
 
-    // Send 0 thrust initially for thrust-lock
-    for (int i = 0; i < 100; ++i) {
-       m_cf.sendSetpoint(0, 0, 0, 0);
-    }
-
     while(!m_isEmergency) {
-      // make sure we ping often enough to stream data out
-      // if (m_enableLogging && !m_sentSetpoint) {
-      //   m_cf.sendPing();
-      // }
-      // m_sentSetpoint = false;
-
+      // FIX ME!!!
       m_cf.sendPositionExternal(0, 1, 2, 3);
 
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-
-    // Make sure we turn the engines off
-    for (int i = 0; i < 100; ++i) {
-       m_cf.sendSetpoint(0, 0, 0, 0);
-    }
-
   }
 
   void onImuData(logImu* data) {
@@ -455,8 +423,6 @@ private:
   ros::Publisher m_pubBattery;
   ros::Publisher m_pubRssi;
   std::vector<ros::Publisher> m_pubLogDataGeneric;
-
-  bool m_sentSetpoint;
 };
 
 bool add_crazyflie(
