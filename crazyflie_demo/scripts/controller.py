@@ -62,13 +62,15 @@ class Controller():
                     self._takeoff()
                 if i == 3 and data.buttons[i] == 1:
                     print("execute trajectory!")
+                    x_offset = rospy.get_param("~x_offset", 0.0)
+                    y_offset = rospy.get_param("~y_offset", 0.0)
                     matrix = np.loadtxt(self._csv_file, delimiter=',', skiprows=1)
                     points = []
                     for row in matrix:
                         p = QuadcopterTrajectoryPoint()
                         p.time_from_start = rospy.Duration.from_sec(row[0])
-                        p.position.x = row[1]
-                        p.position.y = row[2]
+                        p.position.x = row[1] + x_offset
+                        p.position.y = row[2] + y_offset
                         p.position.z = row[3]
                         p.velocity.x = row[4]
                         p.velocity.y = row[5]

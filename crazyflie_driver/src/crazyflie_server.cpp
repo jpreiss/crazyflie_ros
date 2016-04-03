@@ -55,6 +55,7 @@ public:
     , m_serviceEmergency()
     , m_serviceUpdateParams()
     , m_serviceUploadTrajectory()
+    , m_serviceStartTrajectory()
     , m_serviceTakeoff()
     , m_serviceLand()
     , m_subscribeCmdVel()
@@ -70,6 +71,7 @@ public:
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
     // m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
+    m_serviceStartTrajectory = n.advertiseService(tf_prefix + "/start_trajectory", &CrazyflieROS::startTrajectory, this);
     m_serviceTakeoff = n.advertiseService(tf_prefix + "/takeoff", &CrazyflieROS::takeoff, this);
     m_serviceLand = n.advertiseService(tf_prefix + "/land", &CrazyflieROS::land, this);
 
@@ -192,6 +194,17 @@ private:
     return true;
   }
 
+  bool startTrajectory(
+    std_srvs::Empty::Request& req,
+    std_srvs::Empty::Response& res)
+  {
+    ROS_INFO("Start trajectory");
+
+    m_cf.trajectoryStart();
+
+    return true;
+  }
+
   bool takeoff(
     std_srvs::Empty::Request& req,
     std_srvs::Empty::Response& res)
@@ -208,8 +221,8 @@ private:
       transform.getOrigin().z(),
       0, 0, 0, 0, 0);
     m_cf.trajectoryAdd(
-      0, //transform.getOrigin().x,
-      0, //transform.getOrigin().y,
+      transform.getOrigin().x(),
+      transform.getOrigin().y(),
       0.5, //transform.getOrigin().z + 0.5,
       0, 0, 0, 0, 2 * 1000);
     m_cf.trajectoryStart();
@@ -234,8 +247,8 @@ private:
       transform.getOrigin().z(),
       0, 0, 0, 0, 0);
     m_cf.trajectoryAdd(
-      0, //transform.getOrigin().x,
-      0, //transform.getOrigin().y,
+      transform.getOrigin().x(),
+      transform.getOrigin().y(),
       0,
       0, 0, 0, 0, 2 * 1000);
     m_cf.trajectoryStart();
@@ -380,7 +393,7 @@ private:
 
       // m_cf.sendPositionExternal(1.0, 2.0, 3.0, 4.0);
 
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 
@@ -479,6 +492,7 @@ private:
   ros::ServiceServer m_serviceEmergency;
   ros::ServiceServer m_serviceUpdateParams;
   ros::ServiceServer m_serviceUploadTrajectory;
+  ros::ServiceServer m_serviceStartTrajectory;
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
   ros::Subscriber m_subscribeCmdVel;
