@@ -68,7 +68,7 @@ public:
   {
     ros::NodeHandle n;
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
-    m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
+    // m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
     m_serviceTakeoff = n.advertiseService(tf_prefix + "/takeoff", &CrazyflieROS::takeoff, this);
     m_serviceLand = n.advertiseService(tf_prefix + "/land", &CrazyflieROS::land, this);
@@ -198,8 +198,20 @@ private:
   {
     ROS_INFO("Takeoff");
 
+    tf::StampedTransform transform;
+    m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
+
     m_cf.trajectoryReset();
-    m_cf.trajectoryAdd(0, 0, 0.5, 0, 0, 0, 0, 2);
+    m_cf.trajectoryAdd(
+      transform.getOrigin().x(),
+      transform.getOrigin().y(),
+      transform.getOrigin().z(),
+      0, 0, 0, 0, 0);
+    m_cf.trajectoryAdd(
+      0, //transform.getOrigin().x,
+      0, //transform.getOrigin().y,
+      0.5, //transform.getOrigin().z + 0.5,
+      0, 0, 0, 0, 2 * 1000);
     m_cf.trajectoryStart();
     m_cf.setTrajectoryState(true);
 
@@ -212,12 +224,24 @@ private:
   {
     ROS_INFO("land");
 
+    tf::StampedTransform transform;
+    m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
+
     m_cf.trajectoryReset();
-    m_cf.trajectoryAdd(0, 0, 0.05, 0, 0, 0, 0, 3);
+    m_cf.trajectoryAdd(
+      transform.getOrigin().x(),
+      transform.getOrigin().y(),
+      transform.getOrigin().z(),
+      0, 0, 0, 0, 0);
+    m_cf.trajectoryAdd(
+      0, //transform.getOrigin().x,
+      0, //transform.getOrigin().y,
+      0,
+      0, 0, 0, 0, 2 * 1000);
     m_cf.trajectoryStart();
     m_cf.setTrajectoryState(true);
 
-    ros::Duration(3.0).sleep();
+    ros::Duration(2.0).sleep();
 
     m_cf.setTrajectoryState(false);
 
@@ -266,6 +290,8 @@ private:
             break;
         }
       }
+      ros::NodeHandle n;
+      m_serviceUpdateParams = n.advertiseService(m_tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     }
 
     std::unique_ptr<LogBlock<logImu> > logBlockImu;

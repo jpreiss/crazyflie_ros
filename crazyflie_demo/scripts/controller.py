@@ -40,6 +40,12 @@ class Controller():
 
         self._csv_file = csv_file
 
+        rospy.set_param("ctrlMel/massThrust", 135000.0)
+        rospy.set_param("ctrlMel/kp", 0.2)
+        rospy.set_param("ctrlMel/kd", 0.1)
+
+        self._update_params(["ctrlMel/massThrust", "ctrlMel/kp", "ctrlMel/kd"])
+
         # subscribe to the joystick at the end to make sure that all required
         # services were found
         self._buttons = None
