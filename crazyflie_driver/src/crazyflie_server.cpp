@@ -1,4 +1,6 @@
 #include "ros/ros.h"
+#include <tf/transform_listener.h>
+
 #include "crazyflie_driver/AddCrazyflie.h"
 #include "crazyflie_driver/LogBlock.h"
 #include "crazyflie_driver/GenericLogData.h"
@@ -33,6 +35,8 @@ public:
   CrazyflieROS(
     const std::string& link_uri,
     const std::string& tf_prefix,
+    const std::string& frame,
+    const std::string& worldFrame,
     float roll_trim,
     float pitch_trim,
     bool enable_logging,
@@ -40,6 +44,8 @@ public:
     std::vector<crazyflie_driver::LogBlock>& log_blocks)
     : m_cf(link_uri)
     , m_tf_prefix(tf_prefix)
+    , m_frame(frame)
+    , m_worldFrame(worldFrame)
     , m_isEmergency(false)
     , m_roll_trim(roll_trim)
     , m_pitch_trim(pitch_trim)
@@ -49,8 +55,8 @@ public:
     , m_serviceEmergency()
     , m_serviceUpdateParams()
     , m_serviceUploadTrajectory()
-    , m_serviceStartMotors()
-    , m_serviceStopMotors()
+    , m_serviceTakeoff()
+    , m_serviceLand()
     , m_subscribeCmdVel()
     , m_pubImu()
     , m_pubTemp()
@@ -58,13 +64,14 @@ public:
     , m_pubPressure()
     , m_pubBattery()
     , m_pubRssi()
+    , m_listener()
   {
     ros::NodeHandle n;
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
     m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
-    m_serviceStartMotors = n.advertiseService(tf_prefix + "/start_motors", &CrazyflieROS::startMotors, this);
-    m_serviceStopMotors = n.advertiseService(tf_prefix + "/stop_motors", &CrazyflieROS::stopMotors, this);
+    m_serviceTakeoff = n.advertiseService(tf_prefix + "/takeoff", &CrazyflieROS::takeoff, this);
+    m_serviceLand = n.advertiseService(tf_prefix + "/land", &CrazyflieROS::land, this);
 
     m_pubImu = n.advertise<sensor_msgs::Imu>(tf_prefix + "/imu", 10);
     m_pubTemp = n.advertise<sensor_msgs::Temperature>(tf_prefix + "/temperature", 10);
@@ -185,19 +192,33 @@ private:
     return true;
   }
 
-  bool startMotors(
+  bool takeoff(
     std_srvs::Empty::Request& req,
     std_srvs::Empty::Response& res)
   {
+    ROS_INFO("Takeoff");
+
+    m_cf.trajectoryReset();
+    m_cf.trajectoryAdd(0, 0, 0.5, 0, 0, 0, 0, 2);
+    m_cf.trajectoryStart();
     m_cf.setTrajectoryState(true);
 
     return true;
   }
 
-  bool stopMotors(
+  bool land(
     std_srvs::Empty::Request& req,
     std_srvs::Empty::Response& res)
   {
+    ROS_INFO("land");
+
+    m_cf.trajectoryReset();
+    m_cf.trajectoryAdd(0, 0, 0.05, 0, 0, 0, 0, 3);
+    m_cf.trajectoryStart();
+    m_cf.setTrajectoryState(true);
+
+    ros::Duration(3.0).sleep();
+
     m_cf.setTrajectoryState(false);
 
     return true;
@@ -312,9 +333,26 @@ private:
     std::chrono::duration<double> elapsedSeconds = end-start;
     ROS_INFO("Elapsed: %f s", elapsedSeconds.count());
 
+    m_listener.waitForTransform(m_worldFrame, m_frame, ros::Time(0), ros::Duration(10.0) );
+
     while(!m_isEmergency) {
-      // FIX ME!!!
-      m_cf.sendPositionExternal(0, 1, 2, 3);
+
+      tf::StampedTransform transform;
+      m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
+
+      tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
+      tf::Matrix3x3(transform.getRotation()).getRPY(
+          current_euler_roll,
+          current_euler_pitch,
+          current_euler_yaw);
+
+      m_cf.sendPositionExternal(
+        transform.getOrigin().x(),
+        transform.getOrigin().y(),
+        transform.getOrigin().z(),
+        current_euler_yaw);
+
+      // m_cf.sendPositionExternal(1.0, 2.0, 3.0, 4.0);
 
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -403,6 +441,8 @@ private:
 private:
   Crazyflie m_cf;
   std::string m_tf_prefix;
+  std::string m_frame;
+  std::string m_worldFrame;
   bool m_isEmergency;
   float m_roll_trim;
   float m_pitch_trim;
@@ -413,8 +453,8 @@ private:
   ros::ServiceServer m_serviceEmergency;
   ros::ServiceServer m_serviceUpdateParams;
   ros::ServiceServer m_serviceUploadTrajectory;
-  ros::ServiceServer m_serviceStartMotors;
-  ros::ServiceServer m_serviceStopMotors;
+  ros::ServiceServer m_serviceTakeoff;
+  ros::ServiceServer m_serviceLand;
   ros::Subscriber m_subscribeCmdVel;
   ros::Publisher m_pubImu;
   ros::Publisher m_pubTemp;
@@ -423,24 +463,30 @@ private:
   ros::Publisher m_pubBattery;
   ros::Publisher m_pubRssi;
   std::vector<ros::Publisher> m_pubLogDataGeneric;
+
+  tf::TransformListener m_listener;
 };
 
 bool add_crazyflie(
   crazyflie_driver::AddCrazyflie::Request  &req,
   crazyflie_driver::AddCrazyflie::Response &res)
 {
-  ROS_INFO("Adding %s as %s with trim(%f, %f). Logging: %d, Parameters: %d",
+  ROS_INFO("Adding %s as %s with trim(%f, %f). Logging: %d, Parameters: %d, frame: %s, world_frame: %s",
     req.uri.c_str(),
     req.tf_prefix.c_str(),
     req.roll_trim,
     req.pitch_trim,
     req.enable_parameters,
-    req.enable_logging);
+    req.enable_logging,
+    req.frame.c_str(),
+    req.world_frame.c_str());
 
   // Leak intentionally
   CrazyflieROS* cf = new CrazyflieROS(
     req.uri,
     req.tf_prefix,
+    req.frame,
+    req.world_frame,
     req.roll_trim,
     req.pitch_trim,
     req.enable_logging,

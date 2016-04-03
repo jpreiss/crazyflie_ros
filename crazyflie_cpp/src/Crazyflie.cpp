@@ -300,7 +300,6 @@ void Crazyflie::trajectoryAdd(
   request.velocity_y = velocity_y;
   request.velocity_z = velocity_z;
   request.yaw = (int16_t)(yaw * 1000.0);
-  std::cout << "yaw: " << request.yaw << std::endl;
 
   m_lastTrajectoryResponse = -1;
   do {

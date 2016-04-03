@@ -1,5 +1,7 @@
 string uri
 string tf_prefix
+string frame
+string world_frame
 float32 roll_trim
 float32 pitch_trim
 bool enable_logging

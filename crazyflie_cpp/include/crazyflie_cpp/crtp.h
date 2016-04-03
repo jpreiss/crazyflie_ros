@@ -361,7 +361,7 @@ struct crtpLogDataResponse
     uint8_t data[28];
 } __attribute__((packed));
 
-// Port 11 (PosExt)
+// Port 12 (PosExt)
 
 struct crtpPosExt
 {

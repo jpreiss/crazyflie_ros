@@ -10,6 +10,8 @@ int main(int argc, char **argv)
   // read paramaters
   std::string uri;
   std::string tf_prefix;
+  std::string frame;
+  std::string world_frame;
   double roll_trim;
   double pitch_trim;
   bool enable_logging;
@@ -17,6 +19,8 @@ int main(int argc, char **argv)
 
   n.getParam("uri", uri);
   n.getParam("tf_prefix", tf_prefix);
+  n.getParam("frame", frame);
+  n.getParam("world_frame", world_frame);
   n.param("roll_trim", roll_trim, 0.0);
   n.param("pitch_trim", pitch_trim, 0.0);
   n.param("enable_logging", enable_logging, true);
@@ -29,6 +33,8 @@ int main(int argc, char **argv)
   crazyflie_driver::AddCrazyflie addCrazyflie;
   addCrazyflie.request.uri = uri;
   addCrazyflie.request.tf_prefix = tf_prefix;
+  addCrazyflie.request.frame = frame;
+  addCrazyflie.request.world_frame = world_frame;
   addCrazyflie.request.roll_trim = roll_trim;
   addCrazyflie.request.pitch_trim = pitch_trim;
   addCrazyflie.request.enable_logging = enable_logging;
