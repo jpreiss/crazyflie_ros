@@ -50,6 +50,18 @@ target_link_libraries(scan
   ${Boost_LIBRARIES}
 )
 
+###################
+
+add_executable(broadcast_test
+  src/broadcast_test.cpp
+)
+
+## Specify libraries to link a library or executable target against
+target_link_libraries(broadcast_test
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
 
 #############
 ## Install ##
