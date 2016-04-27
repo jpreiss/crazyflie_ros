@@ -133,6 +133,7 @@ bool Crazyradio::open(uint32_t devid)
         setPower(Power_0DBM);
         setArc(3);
         setArdBytes(32);
+        setAckEnable(true);
 
         std::cout << "Configured Dongle with version " << m_version << std::endl;
         return true;
