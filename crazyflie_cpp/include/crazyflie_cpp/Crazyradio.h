@@ -62,6 +62,9 @@ public:
     void setArdTime(uint8_t us);
     void setArdBytes(uint8_t nbytes);
     void setAckEnable(bool enable);
+    bool getAckEnable() const {
+        return m_ackEnable;
+    }
     void setContCarrier(bool active);
 
     void sendPacket(
@@ -90,4 +93,5 @@ private:
     uint8_t m_channel;
     uint64_t m_address;
     Datarate m_datarate;
+    bool m_ackEnable;
 };

@@ -27,6 +27,7 @@ Crazyradio::Crazyradio(uint32_t devid)
     , m_channel(0)
     , m_address(0)
     , m_datarate(Datarate_250KPS)
+    , m_ackEnable(true)
 {
     int result = libusb_init(&m_ctx);
     if (result != LIBUSB_SUCCESS) {
@@ -221,6 +222,7 @@ void Crazyradio::setArdBytes(uint8_t nbytes)
 void Crazyradio::setAckEnable(bool enable)
 {
     sendVendorSetup(ACK_ENABLE, enable, 0, NULL, 0);
+    m_ackEnable = enable;
 }
 
 void Crazyradio::setContCarrier(bool active)
