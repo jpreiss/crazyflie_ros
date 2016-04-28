@@ -363,22 +363,24 @@ struct crtpLogDataResponse
 
 // Port 12 (PosExt)
 
+typedef uint16_t fp16_t;
+
 struct crtpPosExt
 {
-  crtpPosExt(float x, float y, float z, float yaw)
+  crtpPosExt()
     : header(12, 1)
-    , x(x)
-    , y(y)
-    , z(z)
-    , yaw(yaw)
     {
     }
 
     const crtp header;
-    float x; // m
-    float y; // m
-    float z; // m
-    float yaw; // deg
+    uint8_t startId;
+    uint8_t count; // 1 - 3
+    struct {
+      fp16_t x; // m
+      fp16_t y; // m
+      fp16_t z; // m
+      fp16_t yaw; // deg
+    } position[3];
 } __attribute__((packed));
 
 // Port 14 (Trajectory)

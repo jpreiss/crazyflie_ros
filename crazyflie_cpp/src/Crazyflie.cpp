@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <thread>
 
+#include "num.h"
+
 #define MAX_RADIOS 16
 
 Crazyradio* g_crazyradios[MAX_RADIOS];
@@ -329,15 +331,6 @@ void Crazyflie::setTrajectoryState(bool state)
   } while (m_lastTrajectoryResponse != 3 || m_lastTrajectoryResponse2 != state);
 }
 
-void Crazyflie::sendPositionExternal(
-  float x,
-  float y,
-  float z,
-  float yaw)
-{
-  crtpPosExt request(x, y, z, yaw);
-  sendPacket((const uint8_t*)&request, sizeof(request));
-}
 
 void Crazyflie::sendPacket(
   const uint8_t* data,
@@ -359,6 +352,9 @@ void Crazyflie::sendPacket(
     }
     if (m_radio->getDatarate() != m_datarate) {
       m_radio->setDatarate(m_datarate);
+    }
+    if (!m_radio->getAckEnable()) {
+      m_radio->setAckEnable(true);
     }
     m_radio->sendPacket(data, length, ack);
   }
@@ -520,3 +516,115 @@ bool Crazyflie::unregisterLogBlock(
   m_logBlockCb.erase(m_logBlockCb.find(id));
 }
 
+
+////////////////////////////////////////////////////////////////
+
+CrazyflieBroadcaster::CrazyflieBroadcaster(
+  const std::string& link_uri)
+  : m_radio(NULL)
+  , m_devId(0)
+  , m_channel(0)
+  , m_address(0)
+  , m_datarate(Crazyradio::Datarate_250KPS)
+{
+  int datarate;
+  int channel;
+  char datarateType;
+  bool success = false;
+
+  success = std::sscanf(link_uri.c_str(), "radio://%d/%d/%d%c/%lx",
+     &m_devId, &channel, &datarate,
+     &datarateType, &m_address) == 5;
+  if (!success) {
+    success = std::sscanf(link_uri.c_str(), "radio://%d/%d/%d%c",
+       &m_devId, &channel, &datarate,
+       &datarateType) == 4;
+    m_address = 0xE7E7E7E7E7;
+  }
+
+  if (success)
+  {
+    m_channel = channel;
+    if (datarate == 250 && datarateType == 'K') {
+      m_datarate = Crazyradio::Datarate_250KPS;
+    }
+    else if (datarate == 1 && datarateType == 'M') {
+      m_datarate = Crazyradio::Datarate_1MPS;
+    }
+    else if (datarate == 2 && datarateType == 'M') {
+      m_datarate = Crazyradio::Datarate_2MPS;
+    }
+
+    if (m_devId >= MAX_RADIOS) {
+      throw std::runtime_error("This version does not support that many radios. Adjust MAX_RADIOS and recompile!");
+    }
+
+    if (!g_crazyradios[m_devId]) {
+      g_crazyradios[m_devId] = new Crazyradio(m_devId);
+      // g_crazyradios[m_devId]->setAckEnable(false);
+      g_crazyradios[m_devId]->setAckEnable(true);
+      g_crazyradios[m_devId]->setArc(0);
+    }
+
+    m_radio = g_crazyradios[m_devId];
+  }
+  else {
+    throw std::runtime_error("Uri is not valid!");
+  }
+}
+
+void CrazyflieBroadcaster::sendPacket(
+  const uint8_t* data,
+  uint32_t length)
+{
+  {
+    std::unique_lock<std::mutex> mlock(g_mutex[m_devId]);
+    if (m_radio->getAddress() != m_address) {
+      m_radio->setAddress(m_address);
+    }
+    if (m_radio->getChannel() != m_channel) {
+      m_radio->setChannel(m_channel);
+    }
+    if (m_radio->getDatarate() != m_datarate) {
+      m_radio->setDatarate(m_datarate);
+    }
+    if (m_radio->getAckEnable()) {
+      m_radio->setAckEnable(false);
+    }
+    m_radio->sendPacketNoAck(data, length);
+  }
+}
+
+void CrazyflieBroadcaster::trajectoryStart()
+{
+  crtpTrajectoryStartRequest request;
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
+void CrazyflieBroadcaster::setTrajectoryState(bool state)
+{
+  crtpTrajectoryStateRequest request(state);
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
+void CrazyflieBroadcaster::sendPositionExternal(
+  uint8_t startId,
+  const std::vector<stateExternal>& data)
+{
+  crtpPosExt request;
+  for (size_t i = 0; i < data.size(); ++i) {
+    request.position[i%3].x = single2half(data[i].x);
+    request.position[i%3].y = single2half(data[i].y);
+    request.position[i%3].z = single2half(data[i].z);
+    request.position[i%3].yaw = single2half(data[i].yaw);
+    if (i%3 == 2) {
+      request.startId = startId + i - 2;
+      request.count = 3;
+      sendPacket((const uint8_t*)&request, sizeof(request));
+    } else if (i == data.size() - 1) {
+      request.startId = startId + i - i%3;
+      request.count = i%3 + 1;
+      sendPacket((const uint8_t*)&request, sizeof(request));
+    }
+  }
+}

@@ -109,12 +109,6 @@ public:
   void trajectoryStart();
   void setTrajectoryState(bool state);
 
-  void sendPositionExternal(
-    float x,
-    float y,
-    float z,
-    float yaw);
-
 protected:
   void sendPacket(
     const uint8_t* data,
@@ -459,4 +453,42 @@ private:
   std::function<void(std::vector<double>*, void*)> m_callback;
   uint8_t m_id;
   std::vector<Crazyflie::LogType> m_types;
+};
+
+///
+
+class CrazyflieBroadcaster
+{
+public:
+  CrazyflieBroadcaster(
+    const std::string& link_uri);
+
+  void trajectoryStart();
+  void setTrajectoryState(bool state);
+
+  struct stateExternal{
+    float x;
+    float y;
+    float z;
+    float yaw;
+  };
+
+  // Data needs to be consecutive entries, starting from startId
+  // If it doesn't fit in one packet, driver will automatically split
+  void sendPositionExternal(
+    uint8_t startId,
+    const std::vector<stateExternal>& data);
+
+protected:
+  void sendPacket(
+    const uint8_t* data,
+    uint32_t length);
+
+private:
+  Crazyradio* m_radio;
+  int m_devId;
+
+  uint8_t m_channel;
+  uint64_t m_address;
+  Crazyradio::Datarate m_datarate;
 };
