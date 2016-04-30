@@ -51,6 +51,10 @@ public:
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
   }
 
+  const std::string& frame() const {
+    return m_frame;
+  }
+
 
 public:
 
@@ -106,11 +110,10 @@ public:
     return true;
   }
 
-  bool uploadTrajectory(
-    crazyflie_driver::UploadTrajectory::Request& req,
-    crazyflie_driver::UploadTrajectory::Response& res)
+  void uploadTrajectoryThreaded(
+    const crazyflie_driver::UploadTrajectory::Request& req)
   {
-    ROS_INFO("Upload trajectory");
+    ROS_INFO("[%s] Upload trajectory", m_frame.c_str());
 
     m_cf.trajectoryReset();
 
@@ -121,6 +124,19 @@ public:
         p.yaw,
         p.time_from_start.toSec() * 1000);
     }
+
+    ROS_INFO("[%s] Uploaded trajectory", m_frame.c_str());
+
+
+  }
+
+  bool uploadTrajectory(
+    crazyflie_driver::UploadTrajectory::Request& req,
+    crazyflie_driver::UploadTrajectory::Response& res)
+  {
+    std::thread t([=] { uploadTrajectoryThreaded(req); });
+
+    t.join();
 
     return true;
   }
@@ -276,26 +292,31 @@ public:
     }
   }
 
+  void start()
+  {
+    std::thread t(&CrazyflieServer::run, this);
+    t.detach();
+  }
+
   void run()
   {
-    // ROS_INFO("Waiting for transforms...");
+    ROS_INFO("Waiting for transforms...");
 
-    // for (size_t i = 1; i <= m_numCFs; ++i) {
-    //   char buffer[100];
-    //   snprintf(buffer, 100, m_frameFmt.c_str(), i);
-    //   m_listener.waitForTransform(m_worldFrame, std::string(buffer), ros::Time(0), ros::Duration(10.0) );
-    // }
+    for (auto cf : m_cfs) {
+      m_listener.waitForTransform(m_worldFrame, cf->frame(), ros::Time(0), ros::Duration(10.0) );
+    }
 
-    // ROS_INFO("Found all transforms!");
+    ROS_INFO("Found all transforms!");
 
+    // m_numCFs = 25;
     std::vector<CrazyflieBroadcaster::stateExternal> stateExternal(m_numCFs);
 
-    for (size_t i = 0; i < m_numCFs; ++i) {
-      stateExternal[i].x = i + 0.1;
-      stateExternal[i].y = i + 0.2;
-      stateExternal[i].z = i + 0.3;
-      stateExternal[i].yaw = i + 0.4;
-    }
+    // for (size_t i = 0; i < m_numCFs; ++i) {
+    //   stateExternal[i].x = i + 0.1;
+    //   stateExternal[i].y = i + 0.2;
+    //   stateExternal[i].z = i + 0.3;
+    //   stateExternal[i].yaw = i + 0.4;
+    // }
 
     while(ros::ok() && !m_isEmergency) {
 
@@ -306,30 +327,29 @@ public:
       //   stateExternal[i].yaw += 1.0;
       // }
 
-      // for (size_t i = 1; i <= m_numCFs; ++i) {
-      //   char buffer[100];
-      //   snprintf(buffer, 100, m_frameFmt.c_str(), i);
+      for (size_t i = 0; i < m_numCFs; ++i) {
+        tf::StampedTransform transform;
+        m_listener.lookupTransform(m_worldFrame, m_cfs[i]->frame(), ros::Time(0), transform);
 
-      //   tf::StampedTransform transform;
-      //   m_listener.lookupTransform(m_worldFrame, std::string(buffer), ros::Time(0), transform);
+        tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
+        tf::Matrix3x3(transform.getRotation()).getRPY(
+            current_euler_roll,
+            current_euler_pitch,
+            current_euler_yaw);
 
-      //   tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
-      //   tf::Matrix3x3(transform.getRotation()).getRPY(
-      //       current_euler_roll,
-      //       current_euler_pitch,
-      //       current_euler_yaw);
-
-      //   stateExternal[i-1].x = transform.getOrigin().x();
-      //   stateExternal[i-1].y = transform.getOrigin().y();
-      //   stateExternal[i-1].z = transform.getOrigin().z();
-      //   stateExternal[i-1].yaw = current_euler_yaw;
-      // }
+        stateExternal[i].x = transform.getOrigin().x();
+        stateExternal[i].y = transform.getOrigin().y();
+        stateExternal[i].z = transform.getOrigin().z();
+        stateExternal[i].yaw = current_euler_yaw;
+      }
 
       m_cfbc.sendPositionExternal(
         1,
         stateExternal);
 
-      ros::spinOnce();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+      // ros::spinOnce();
     }
   }
 
@@ -363,9 +383,7 @@ private:
     return true;
   }
 
-  bool takeoff(
-    std_srvs::Empty::Request& req,
-    std_srvs::Empty::Response& res)
+  void takeoffThreaded()
   {
     for (auto cf : m_cfs) {
       cf->prepareTakeoff();
@@ -378,12 +396,20 @@ private:
       m_cfbc.setTrajectoryState(true);
     }
 
+    ROS_INFO("Took off!");
+  }
+
+  bool takeoff(
+    std_srvs::Empty::Request& req,
+    std_srvs::Empty::Response& res)
+  {
+    std::thread t(&CrazyflieServer::takeoffThreaded, this);
+    t.detach();
+
     return true;
   }
 
-  bool land(
-    std_srvs::Empty::Request& req,
-    std_srvs::Empty::Response& res)
+  void landThreaded()
   {
     for (auto cf : m_cfs) {
       cf->prepareLand();
@@ -401,6 +427,16 @@ private:
     for (size_t i = 0; i < 10; ++i) {
       m_cfbc.setTrajectoryState(false);
     }
+
+    ROS_INFO("Landed!");
+  }
+
+  bool land(
+    std_srvs::Empty::Request& req,
+    std_srvs::Empty::Response& res)
+  {
+    std::thread t(&CrazyflieServer::landThreaded, this);
+    t.detach();
 
     return true;
   }
@@ -458,7 +494,11 @@ int main(int argc, char **argv)
   }
   ROS_INFO("All CFs are ready!");
 
-  server.run();
+  server.start();
+
+  // server.run();
+
+  ros::spin();
 
   return 0;
 }

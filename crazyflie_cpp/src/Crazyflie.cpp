@@ -306,7 +306,7 @@ void Crazyflie::trajectoryAdd(
   m_lastTrajectoryResponse = -1;
   do {
     sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId);
   ++m_lastTrajectoryId;
 }
@@ -626,5 +626,6 @@ void CrazyflieBroadcaster::sendPositionExternal(
       request.count = i%3 + 1;
       sendPacket((const uint8_t*)&request, sizeof(request));
     }
+    // std::this_thread::sleep_for(std::chrono::microseconds(5000));
   }
 }

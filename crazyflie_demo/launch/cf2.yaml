@@ -7,12 +7,12 @@ configurations:
       "1": [0.012398,0.011179,0.027415]
       "2": [0.027939,-0.021060,0.019083]
       "3": [-0.016644,0.026118,0.018928]
-numObjects: 2
+numObjects: 1
 objects:
   "0":
     name: crazyflie1
     configuration: 0
-    initialPosition: [0, 0.75, 0]
+    initialPosition: [0, 0, 0]
     initialYaw: 0
   "1":
     name: crazyflie2
