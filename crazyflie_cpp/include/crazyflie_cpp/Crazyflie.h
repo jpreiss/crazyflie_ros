@@ -106,8 +106,8 @@ public:
     float velocity_x, float velocity_y, float velocity_z,
     float yaw,
     uint16_t time_from_start);
-  void trajectoryStart();
-  void setTrajectoryState(bool state);
+  // void trajectoryStart();
+  // void setTrajectoryState(bool state);
 
 protected:
   void sendPacket(
@@ -464,9 +464,13 @@ public:
     const std::string& link_uri);
 
   void trajectoryStart();
-  void setTrajectoryState(bool state);
+  // void setTrajectoryState(bool state);
+
+  void takeoff();
+  void land();
 
   struct stateExternal{
+    uint8_t id;
     float x;
     float y;
     float z;
@@ -476,7 +480,6 @@ public:
   // Data needs to be consecutive entries, starting from startId
   // If it doesn't fit in one packet, driver will automatically split
   void sendPositionExternal(
-    uint8_t startId,
     const std::vector<stateExternal>& data);
 
 protected:

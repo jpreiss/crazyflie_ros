@@ -37,12 +37,14 @@ public:
     const std::string& tf_prefix,
     const std::string& frame,
     const std::string& worldFrame,
-    bool enable_parameters)
+    bool enable_parameters,
+    int id)
     : m_cf(link_uri)
     , m_tf_prefix(tf_prefix)
     , m_frame(frame)
     , m_worldFrame(worldFrame)
     , m_enableParameters(enable_parameters)
+    , m_id(id)
     , m_serviceUpdateParams()
     , m_serviceUploadTrajectory()
     , m_listener()
@@ -53,6 +55,10 @@ public:
 
   const std::string& frame() const {
     return m_frame;
+  }
+
+  const int id() const {
+    return m_id;
   }
 
 
@@ -142,49 +148,49 @@ public:
   }
 
 
-  bool prepareTakeoff()
-  {
-    ROS_INFO("Prepare Takeoff");
+  // bool prepareTakeoff()
+  // {
+  //   ROS_INFO("Prepare Takeoff");
 
-    tf::StampedTransform transform;
-    m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
+  //   tf::StampedTransform transform;
+  //   m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
 
-    m_cf.trajectoryReset();
-    m_cf.trajectoryAdd(
-      transform.getOrigin().x(),
-      transform.getOrigin().y(),
-      transform.getOrigin().z(),
-      0, 0, 0, 0, 0);
-    m_cf.trajectoryAdd(
-      transform.getOrigin().x(),
-      transform.getOrigin().y(),
-      0.5, //transform.getOrigin().z + 0.5,
-      0, 0, 0, 0, 2 * 1000);
+  //   m_cf.trajectoryReset();
+  //   m_cf.trajectoryAdd(
+  //     transform.getOrigin().x(),
+  //     transform.getOrigin().y(),
+  //     transform.getOrigin().z(),
+  //     0, 0, 0, 0, 0);
+  //   m_cf.trajectoryAdd(
+  //     transform.getOrigin().x(),
+  //     transform.getOrigin().y(),
+  //     0.5, //transform.getOrigin().z + 0.5,
+  //     0, 0, 0, 0, 2 * 1000);
 
-    return true;
-  }
+  //   return true;
+  // }
 
-  bool prepareLand()
-  {
-    ROS_INFO("Prepare Land");
+  // bool prepareLand()
+  // {
+  //   ROS_INFO("Prepare Land");
 
-    tf::StampedTransform transform;
-    m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
+  //   tf::StampedTransform transform;
+  //   m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
 
-    m_cf.trajectoryReset();
-    m_cf.trajectoryAdd(
-      transform.getOrigin().x(),
-      transform.getOrigin().y(),
-      transform.getOrigin().z(),
-      0, 0, 0, 0, 0);
-    m_cf.trajectoryAdd(
-      transform.getOrigin().x(),
-      transform.getOrigin().y(),
-      0,
-      0, 0, 0, 0, 2 * 1000);
+  //   m_cf.trajectoryReset();
+  //   m_cf.trajectoryAdd(
+  //     transform.getOrigin().x(),
+  //     transform.getOrigin().y(),
+  //     transform.getOrigin().z(),
+  //     0, 0, 0, 0, 0);
+  //   m_cf.trajectoryAdd(
+  //     transform.getOrigin().x(),
+  //     transform.getOrigin().y(),
+  //     0,
+  //     0, 0, 0, 0, 2 * 1000);
 
-    return true;
-  }
+  //   return true;
+  // }
 
   void run()
   {
@@ -253,6 +259,7 @@ private:
   std::string m_frame;
   std::string m_worldFrame;
   bool m_enableParameters;
+  int m_id;
 
   ros::ServiceServer m_serviceUpdateParams;
   ros::ServiceServer m_serviceUploadTrajectory;
@@ -337,14 +344,14 @@ public:
             current_euler_pitch,
             current_euler_yaw);
 
+        stateExternal[i].id = m_cfs[i]->id();
         stateExternal[i].x = transform.getOrigin().x();
         stateExternal[i].y = transform.getOrigin().y();
         stateExternal[i].z = transform.getOrigin().z();
-        stateExternal[i].yaw = current_euler_yaw;
+        stateExternal[i].yaw = atan2(sin(current_euler_yaw), cos(current_euler_yaw));
       }
 
       m_cfbc.sendPositionExternal(
-        1,
         stateExternal);
 
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -356,7 +363,8 @@ public:
   void addCrazyflie(
     const std::string& uri,
     const std::string& tf_prefix,
-    const std::string& frame)
+    const std::string& frame,
+    int id)
   {
     ROS_INFO("Adding CF: %s (%s, %s)...", tf_prefix.c_str(), uri.c_str(), frame.c_str());
     CrazyflieROS* cf = new CrazyflieROS(
@@ -364,7 +372,8 @@ public:
       tf_prefix,
       frame,
       m_worldFrame,
-      true
+      true,
+      id
       );
     cf->run();
     m_cfs.push_back(cf);
@@ -383,60 +392,28 @@ private:
     return true;
   }
 
-  void takeoffThreaded()
-  {
-    for (auto cf : m_cfs) {
-      cf->prepareTakeoff();
-    }
-
-    for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.trajectoryStart();
-    }
-    for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.setTrajectoryState(true);
-    }
-
-    ROS_INFO("Took off!");
-  }
-
   bool takeoff(
     std_srvs::Empty::Request& req,
     std_srvs::Empty::Response& res)
   {
-    std::thread t(&CrazyflieServer::takeoffThreaded, this);
-    t.detach();
+    ROS_INFO("Takeoff!");
+
+    for (size_t i = 0; i < 10; ++i) {
+      m_cfbc.takeoff();
+    }
 
     return true;
-  }
-
-  void landThreaded()
-  {
-    for (auto cf : m_cfs) {
-      cf->prepareLand();
-    }
-
-    for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.trajectoryStart();
-    }
-    for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.setTrajectoryState(true);
-    }
-
-    ros::Duration(2.0).sleep();
-
-    for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.setTrajectoryState(false);
-    }
-
-    ROS_INFO("Landed!");
   }
 
   bool land(
     std_srvs::Empty::Request& req,
     std_srvs::Empty::Response& res)
   {
-    std::thread t(&CrazyflieServer::landThreaded, this);
-    t.detach();
+    ROS_INFO("Land!");
+
+    for (size_t i = 0; i < 10; ++i) {
+      m_cfbc.land();
+    }
 
     return true;
   }
@@ -490,7 +467,9 @@ int main(int argc, char **argv)
     n.getParam(sstr.str() + "/uri", uri);
     std::string frame;
     n.getParam(sstr.str() + "/frame", frame);
-    server.addCrazyflie(uri, sstr.str(), frame);
+    int id;
+    n.getParam(sstr.str() + "/id", id);
+    server.addCrazyflie(uri, sstr.str(), frame, id);
   }
   ROS_INFO("All CFs are ready!");
 

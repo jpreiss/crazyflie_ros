@@ -373,9 +373,8 @@ struct crtpPosExt
     }
 
     const crtp header;
-    uint8_t startId;
-    uint8_t count; // 1 - 3
     struct {
+      uint8_t id;
       fp16_t x; // m
       fp16_t y; // m
       fp16_t z; // m
@@ -430,19 +429,55 @@ struct crtpTrajectoryStartRequest
     const uint8_t command;
 } __attribute__((packed));
 
-struct crtpTrajectoryStateRequest
+struct crtpTrajectoryTakeoffRequest
 {
-  crtpTrajectoryStateRequest(uint8_t state)
+  crtpTrajectoryTakeoffRequest(
+    float height,
+    uint16_t time_from_start)
     : header(14, 1)
-    , command(3)
-    , state(state)
+    , command(4)
+    , height(height)
+    , time_from_start(time_from_start)
     {
     }
 
     const crtp header;
     const uint8_t command;
-    const uint8_t state;
+    float height; // m (absolute)
+    uint16_t time_from_start; // ms
 } __attribute__((packed));
+
+struct crtpTrajectoryLandRequest
+{
+  crtpTrajectoryLandRequest(
+    float height,
+    uint16_t time_from_start)
+    : header(14, 1)
+    , command(5)
+    , height(height)
+    , time_from_start(time_from_start)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+    float height; // m (absolute)
+    uint16_t time_from_start; // ms
+} __attribute__((packed));
+
+// struct crtpTrajectoryStateRequest
+// {
+//   crtpTrajectoryStateRequest(uint8_t state)
+//     : header(14, 1)
+//     , command(3)
+//     , state(state)
+//     {
+//     }
+
+//     const crtp header;
+//     const uint8_t command;
+//     const uint8_t state;
+// } __attribute__((packed));
 
 struct crtpTrajectoryResponse
 {

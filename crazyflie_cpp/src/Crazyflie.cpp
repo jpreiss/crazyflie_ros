@@ -311,25 +311,25 @@ void Crazyflie::trajectoryAdd(
   ++m_lastTrajectoryId;
 }
 
-void Crazyflie::trajectoryStart()
-{
-  m_lastTrajectoryResponse = -1;
-  do {
-    crtpTrajectoryStartRequest request;
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  } while (m_lastTrajectoryResponse != 2);
-}
+// void Crazyflie::trajectoryStart()
+// {
+//   m_lastTrajectoryResponse = -1;
+//   do {
+//     crtpTrajectoryStartRequest request;
+//     sendPacket((const uint8_t*)&request, sizeof(request));
+//     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+//   } while (m_lastTrajectoryResponse != 2);
+// }
 
-void Crazyflie::setTrajectoryState(bool state)
-{
-  m_lastTrajectoryResponse = -1;
-  do {
-    crtpTrajectoryStateRequest request(state);
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  } while (m_lastTrajectoryResponse != 3 || m_lastTrajectoryResponse2 != state);
-}
+// void Crazyflie::setTrajectoryState(bool state)
+// {
+//   m_lastTrajectoryResponse = -1;
+//   do {
+//     crtpTrajectoryStateRequest request(state);
+//     sendPacket((const uint8_t*)&request, sizeof(request));
+//     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+//   } while (m_lastTrajectoryResponse != 3 || m_lastTrajectoryResponse2 != state);
+// }
 
 
 void Crazyflie::sendPacket(
@@ -601,30 +601,42 @@ void CrazyflieBroadcaster::trajectoryStart()
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
-void CrazyflieBroadcaster::setTrajectoryState(bool state)
+// void CrazyflieBroadcaster::setTrajectoryState(bool state)
+// {
+//   crtpTrajectoryStateRequest request(state);
+//   sendPacket((const uint8_t*)&request, sizeof(request));
+// }
+
+void CrazyflieBroadcaster::takeoff()
 {
-  crtpTrajectoryStateRequest request(state);
+  crtpTrajectoryTakeoffRequest request(0.5, 2000);
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
+void CrazyflieBroadcaster::land()
+{
+  crtpTrajectoryLandRequest request(0.0, 2000);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
 void CrazyflieBroadcaster::sendPositionExternal(
-  uint8_t startId,
   const std::vector<stateExternal>& data)
 {
   crtpPosExt request;
+  request.position[0].id = 0;
+  request.position[1].id = 0;
+  request.position[2].id = 0;
   for (size_t i = 0; i < data.size(); ++i) {
+    request.position[i%3].id = data[i].id;
     request.position[i%3].x = single2half(data[i].x);
     request.position[i%3].y = single2half(data[i].y);
     request.position[i%3].z = single2half(data[i].z);
     request.position[i%3].yaw = single2half(data[i].yaw);
-    if (i%3 == 2) {
-      request.startId = startId + i - 2;
-      request.count = 3;
+    if (i%3 == 2 || i == data.size() - 1) {
       sendPacket((const uint8_t*)&request, sizeof(request));
-    } else if (i == data.size() - 1) {
-      request.startId = startId + i - i%3;
-      request.count = i%3 + 1;
-      sendPacket((const uint8_t*)&request, sizeof(request));
+      request.position[0].id = 0;
+      request.position[1].id = 0;
+      request.position[2].id = 0;
     }
     // std::this_thread::sleep_for(std::chrono::microseconds(5000));
   }

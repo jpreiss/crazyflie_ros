@@ -3,10 +3,11 @@ project(crazyflie_manager)
 
 find_package(catkin REQUIRED COMPONENTS
   tf
+  crazyflie_driver
 )
 
 # Enable C++14
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 ## System dependencies are found with CMake's conventions
 # find_package(Eigen3 REQUIRED)
@@ -81,7 +82,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES crazyflie_controller
-#  CATKIN_DEPENDS other_catkin_pkg
+  CATKIN_DEPENDS crazyflie_driver
 #  DEPENDS system_lib
 )
 
@@ -92,6 +93,9 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+)
 
 ## Declare a cpp library
 # add_library(crazyflie_controller

@@ -6,13 +6,15 @@
     <rosparam>
       broadcast_uri: "radio://0/80/2M/FFE7E7E7E7"
       world_frame: "/world"
-      num_cfs: 1
+      num_cfs: 2
       crazyflie1:
         uri: "radio://0/80/2M/E7E7E7E701"
-        frame: "/vicon/calib/calib"
+        frame: "/crazyflie1"
+        id: 1
       crazyflie2:
         uri: "radio://0/80/2M/E7E7E7E702"
         frame: "/crazyflie2"
+        id: 2
     </rosparam>
   </node>
 
@@ -21,7 +23,13 @@
   </node>
 
   <node pkg="crazyflie_manager" type="crazyflie_manager" name="crazyflie_manager" output="screen">
-    <param name="csv_file" value="$(find crazyflie_demo)/scripts/trajectory1.csv" />
+    <param name="num_cfs" value="2" />
+    <param name="crazyflie1/csv_file" value="$(find crazyflie_demo)/scripts/trajectory1.csv" />
+    <param name="crazyflie1/x_offset" value="0.0" />
+    <param name="crazyflie1/y_offset" value="0.0" />
+    <param name="crazyflie2/csv_file" value="$(find crazyflie_demo)/scripts/trajectory1.csv" />
+    <param name="crazyflie2/x_offset" value="0.0" />
+    <param name="crazyflie2/y_offset" value="-0.75" />
   </node>
 
   <!-- run vicon bridge -->
