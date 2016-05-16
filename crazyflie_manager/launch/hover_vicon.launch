@@ -6,17 +6,21 @@
     <rosparam>
       broadcast_uri: "radio://0/80/2M/FFE7E7E7E7"
       world_frame: "/world"
-      num_cfs: 2
+      num_cfs: 1
       crazyflie1:
-        uri: "radio://0/80/2M/E7E7E7E701"
-        frame: "/crazyflie1"
-        id: 1
+        uri: "radio://0/80/2M/E7E7E7E702"
+        frame: "/vicon/calib/calib"
+        id: 2
       crazyflie2:
         uri: "radio://0/80/2M/E7E7E7E702"
         frame: "/crazyflie2"
         id: 2
     </rosparam>
   </node>
+
+  <group ns="crazyflie1">
+    <node name="setParams" pkg="crazyflie_manager" type="enablePosCtrl.py" output="screen" />
+  </group>
 
   <node name="joy" pkg="joy" type="joy_node" output="screen">
     <param name="dev" value="$(arg joy_dev)" />
@@ -35,8 +39,8 @@
   <!-- run vicon bridge -->
   <include file="$(find vicon_bridge)/launch/vicon.launch"/>
 
-  <node name="object_tracker" pkg="object_tracker" type="object_tracker_node" output="screen">
+<!--   <node name="object_tracker" pkg="object_tracker" type="object_tracker_node" output="screen">
     <rosparam command="load" file="$(find crazyflie_demo)/launch/cf2.yaml" />
-  </node>
+  </node> -->
 
 </launch>
