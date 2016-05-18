@@ -482,6 +482,19 @@ public:
   void sendPositionExternal(
     const std::vector<stateExternal>& data);
 
+  struct stateExternalBringup{
+    float x;
+    float y;
+    float z;
+    float q0;
+    float q1;
+    float q2;
+    float q3;
+  };
+
+  void sendPositionExternalBringup(
+    const stateExternalBringup& data);
+
 protected:
   void sendPacket(
     const uint8_t* data,

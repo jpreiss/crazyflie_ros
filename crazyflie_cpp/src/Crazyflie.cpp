@@ -641,3 +641,17 @@ void CrazyflieBroadcaster::sendPositionExternal(
     // std::this_thread::sleep_for(std::chrono::microseconds(5000));
   }
 }
+
+void CrazyflieBroadcaster::sendPositionExternalBringup(
+  const stateExternalBringup& data)
+{
+  crtpPosExtBringup request;
+  request.x = data.x;
+  request.y = data.y;
+  request.z = data.z;
+  request.q0 = data.q0;
+  request.q1 = data.q1;
+  request.q2 = data.q2;
+  request.q3 = data.q3;
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}

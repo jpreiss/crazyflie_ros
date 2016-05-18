@@ -361,6 +361,25 @@ struct crtpLogDataResponse
     uint8_t data[28];
 } __attribute__((packed));
 
+// Port 11 (PosExtBringup)
+
+struct crtpPosExtBringup
+{
+  crtpPosExtBringup()
+    : header(11, 1)
+    {
+    }
+
+    const crtp header;
+    float x;
+    float y;
+    float z;
+    float q0;
+    float q1;
+    float q2;
+    float q3;
+} __attribute__((packed));
+
 // Port 12 (PosExt)
 
 typedef uint16_t fp16_t;

@@ -316,7 +316,8 @@ public:
     ROS_INFO("Found all transforms!");
 
     // m_numCFs = 25;
-    std::vector<CrazyflieBroadcaster::stateExternal> stateExternal(m_numCFs);
+    // std::vector<CrazyflieBroadcaster::stateExternal> stateExternal(m_numCFs);
+    CrazyflieBroadcaster::stateExternalBringup stateExternalBringup;
 
     // for (size_t i = 0; i < m_numCFs; ++i) {
     //   stateExternal[i].x = i + 0.1;
@@ -338,21 +339,33 @@ public:
         tf::StampedTransform transform;
         m_listener.lookupTransform(m_worldFrame, m_cfs[i]->frame(), ros::Time(0), transform);
 
-        tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
-        tf::Matrix3x3(transform.getRotation()).getRPY(
-            current_euler_roll,
-            current_euler_pitch,
-            current_euler_yaw);
+        // tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
+        // tf::Matrix3x3(transform.getRotation()).getRPY(
+        //     current_euler_roll,
+        //     current_euler_pitch,
+        //     current_euler_yaw);
 
-        stateExternal[i].id = m_cfs[i]->id();
-        stateExternal[i].x = transform.getOrigin().x();
-        stateExternal[i].y = transform.getOrigin().y();
-        stateExternal[i].z = transform.getOrigin().z();
-        stateExternal[i].yaw = atan2(sin(current_euler_yaw), cos(current_euler_yaw));
+        // stateExternal[i].id = m_cfs[i]->id();
+        // stateExternal[i].x = transform.getOrigin().x();
+        // stateExternal[i].y = transform.getOrigin().y();
+        // stateExternal[i].z = transform.getOrigin().z();
+        // stateExternal[i].yaw = atan2(sin(current_euler_yaw), cos(current_euler_yaw));
+        stateExternalBringup.x = transform.getOrigin().x();
+        stateExternalBringup.y = transform.getOrigin().y();
+        stateExternalBringup.z = transform.getOrigin().z();
+        stateExternalBringup.q0 = transform.getRotation().x();
+        stateExternalBringup.q1 = transform.getRotation().y();
+        stateExternalBringup.q2 = transform.getRotation().z();
+        stateExternalBringup.q3 = transform.getRotation().w();
+
+
       }
 
-      m_cfbc.sendPositionExternal(
-        stateExternal);
+      // m_cfbc.sendPositionExternal(
+      //   stateExternal);
+
+      m_cfbc.sendPositionExternalBringup(
+        stateExternalBringup);
 
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
