@@ -4,13 +4,16 @@
 
   <node pkg="crazyflie_driver" type="crazyflie_server" name="crazyflie_server" output="screen">
     <rosparam>
-      broadcast_uri: "radio://0/80/2M/FFE7E7E7E7"
+      broadcast_uri: "radio://0/100/2M/FFE7E7E7E7"
       world_frame: "/world"
       num_cfs: 1
       crazyflie1:
-        uri: "radio://0/80/2M/E7E7E7E702"
-        frame: "/vicon/calib/calib"
-        id: 2
+        uri: "radio://0/100/2M/E7E7E7E701"
+        frame: "/vicon/cf_config1/cf_config1"
+        id: 1
+        genericLogTopics: ["log1"]
+        genericLogTopicFrequencies: [10]
+        genericLogTopic_log1_Variables: ["stabilizer.x", "stabilizer.y", "stabilizer.z"]
       crazyflie2:
         uri: "radio://0/80/2M/E7E7E7E702"
         frame: "/crazyflie2"

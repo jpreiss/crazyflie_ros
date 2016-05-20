@@ -38,7 +38,8 @@ public:
     const std::string& frame,
     const std::string& worldFrame,
     bool enable_parameters,
-    int id)
+    int id,
+    const std::vector<crazyflie_driver::LogBlock>& log_blocks)
     : m_cf(link_uri)
     , m_tf_prefix(tf_prefix)
     , m_frame(frame)
@@ -48,9 +49,15 @@ public:
     , m_serviceUpdateParams()
     , m_serviceUploadTrajectory()
     , m_listener()
+    , m_logBlocks(log_blocks)
   {
     ros::NodeHandle n;
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
+
+    for (auto& logBlock : m_logBlocks)
+    {
+      m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(tf_prefix + "/" + logBlock.topic_name, 10));
+    }
   }
 
   const std::string& frame() const {
@@ -238,6 +245,32 @@ public:
       m_serviceUpdateParams = n.advertiseService(m_tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     }
 
+    // Logging
+    ROS_INFO("Requesting Logging variables...");
+    m_cf.requestLogToc();
+
+    ROS_INFO("#LogBlocks: %d", m_logBlocks.size());
+    m_logBlocksGeneric.resize(m_logBlocks.size());
+    // custom log blocks
+    size_t i = 0;
+    for (auto& logBlock : m_logBlocks)
+    {
+      std::function<void(std::vector<double>*, void* userData)> cb =
+        std::bind(
+          &CrazyflieROS::onLogCustom,
+          this,
+          std::placeholders::_1,
+          std::placeholders::_2);
+
+      m_logBlocksGeneric[i].reset(new LogBlockGeneric(
+        &m_cf,
+        logBlock.variables,
+        (void*)&m_pubLogDataGeneric[i],
+        cb));
+      m_logBlocksGeneric[i]->start(logBlock.frequency / 10);
+      ++i;
+    }
+
 
     ROS_INFO("Ready...");
     auto end = std::chrono::system_clock::now();
@@ -246,11 +279,27 @@ public:
 
   }
 
+  void sendPositionExternalBringup(
+    const stateExternalBringup& data)
+  {
+    m_cf.sendPositionExternalBringup(data);
+  }
+
 
   void onLinkQuality(float linkQuality) {
       if (linkQuality < 0.7) {
         ROS_WARN("Link Quality low (%f)", linkQuality);
       }
+  }
+
+  void onLogCustom(std::vector<double>* values, void* userData) {
+
+    ros::Publisher* pub = reinterpret_cast<ros::Publisher*>(userData);
+
+    crazyflie_driver::GenericLogData msg;
+    msg.values = *values;
+
+    pub->publish(msg);
   }
 
 private:
@@ -265,6 +314,10 @@ private:
   ros::ServiceServer m_serviceUploadTrajectory;
 
   tf::TransformListener m_listener;
+
+  std::vector<crazyflie_driver::LogBlock> m_logBlocks;
+  std::vector<ros::Publisher> m_pubLogDataGeneric;
+  std::vector<std::unique_ptr<LogBlockGeneric> > m_logBlocksGeneric;
 };
 
 class CrazyflieServer
@@ -317,7 +370,7 @@ public:
 
     // m_numCFs = 25;
     // std::vector<CrazyflieBroadcaster::stateExternal> stateExternal(m_numCFs);
-    CrazyflieBroadcaster::stateExternalBringup stateExternalBringup;
+    stateExternalBringup stateExternalBringup;
 
     // for (size_t i = 0; i < m_numCFs; ++i) {
     //   stateExternal[i].x = i + 0.1;
@@ -358,14 +411,16 @@ public:
         stateExternalBringup.q2 = transform.getRotation().z();
         stateExternalBringup.q3 = transform.getRotation().w();
 
+        m_cfs[i]->sendPositionExternalBringup(
+          stateExternalBringup);
 
       }
 
       // m_cfbc.sendPositionExternal(
       //   stateExternal);
 
-      m_cfbc.sendPositionExternalBringup(
-        stateExternalBringup);
+      // m_cfbc.sendPositionExternalBringup(
+      //   stateExternalBringup);
 
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
@@ -377,7 +432,8 @@ public:
     const std::string& uri,
     const std::string& tf_prefix,
     const std::string& frame,
-    int id)
+    int id,
+    const std::vector<crazyflie_driver::LogBlock>& logBlocks)
   {
     ROS_INFO("Adding CF: %s (%s, %s)...", tf_prefix.c_str(), uri.c_str(), frame.c_str());
     CrazyflieROS* cf = new CrazyflieROS(
@@ -386,7 +442,8 @@ public:
       frame,
       m_worldFrame,
       true,
-      id
+      id,
+      logBlocks
       );
     cf->run();
     m_cfs.push_back(cf);
@@ -482,7 +539,33 @@ int main(int argc, char **argv)
     n.getParam(sstr.str() + "/frame", frame);
     int id;
     n.getParam(sstr.str() + "/id", id);
-    server.addCrazyflie(uri, sstr.str(), frame, id);
+    // custom log blocks
+    std::vector<std::string> genericLogTopics;
+    n.param(sstr.str() + "/genericLogTopics", genericLogTopics, std::vector<std::string>());
+    std::vector<int> genericLogTopicFrequencies;
+    n.param(sstr.str() + "/genericLogTopicFrequencies", genericLogTopicFrequencies, std::vector<int>());
+
+    std::vector<crazyflie_driver::LogBlock> logBlocks;
+
+    if (genericLogTopics.size() == genericLogTopicFrequencies.size())
+    {
+      size_t i = 0;
+      for (auto& topic : genericLogTopics)
+      {
+        crazyflie_driver::LogBlock logBlock;
+        logBlock.topic_name = topic;
+        logBlock.frequency = genericLogTopicFrequencies[i];
+        n.getParam(sstr.str() + "/genericLogTopic_" + topic + "_Variables", logBlock.variables);
+        logBlocks.push_back(logBlock);
+        ++i;
+      }
+    }
+    else
+    {
+      ROS_ERROR("Cardinality of genericLogTopics and genericLogTopicFrequencies does not match!");
+    }
+
+    server.addCrazyflie(uri, sstr.str(), frame, id, logBlocks);
   }
   ROS_INFO("All CFs are ready!");
 

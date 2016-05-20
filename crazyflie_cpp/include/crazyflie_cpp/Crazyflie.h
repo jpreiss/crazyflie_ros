@@ -9,6 +9,16 @@
 #include <map>
 #include <iostream>
 
+struct stateExternalBringup{
+  float x;
+  float y;
+  float z;
+  float q0;
+  float q1;
+  float q2;
+  float q3;
+};
+
 class Crazyflie
 {
 public:
@@ -108,6 +118,9 @@ public:
     uint16_t time_from_start);
   // void trajectoryStart();
   // void setTrajectoryState(bool state);
+
+  void sendPositionExternalBringup(
+    const stateExternalBringup& data);
 
 protected:
   void sendPacket(
@@ -481,16 +494,6 @@ public:
   // If it doesn't fit in one packet, driver will automatically split
   void sendPositionExternal(
     const std::vector<stateExternal>& data);
-
-  struct stateExternalBringup{
-    float x;
-    float y;
-    float z;
-    float q0;
-    float q1;
-    float q2;
-    float q3;
-  };
 
   void sendPositionExternalBringup(
     const stateExternalBringup& data);
