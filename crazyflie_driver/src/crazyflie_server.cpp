@@ -398,7 +398,7 @@ public:
         //     current_euler_pitch,
         //     current_euler_yaw);
 
-        // stateExternal[i].id = m_cfs[i]->id();
+        stateExternalBringup.id = m_cfs[i]->id();
         // stateExternal[i].x = transform.getOrigin().x();
         // stateExternal[i].y = transform.getOrigin().y();
         // stateExternal[i].z = transform.getOrigin().z();
