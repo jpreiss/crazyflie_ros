@@ -249,7 +249,6 @@ public:
     ROS_INFO("Requesting Logging variables...");
     m_cf.requestLogToc();
 
-    ROS_INFO("#LogBlocks: %d", m_logBlocks.size());
     m_logBlocksGeneric.resize(m_logBlocks.size());
     // custom log blocks
     size_t i = 0;
