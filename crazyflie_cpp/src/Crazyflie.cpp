@@ -335,13 +335,15 @@ void Crazyflie::sendPositionExternalBringup(
   const stateExternalBringup& data)
 {
   crtpPosExtBringup request;
-  request.x = data.x;
-  request.y = data.y;
-  request.z = data.z;
-  request.q0 = data.q0;
-  request.q1 = data.q1;
-  request.q2 = data.q2;
-  request.q3 = data.q3;
+  request.pose[0].id = data.id;
+  request.pose[0].x = single2half(data.x);
+  request.pose[0].y = single2half(data.y);
+  request.pose[0].z = single2half(data.z);
+  request.pose[0].quat[0] = int16_t(data.q0 * 32768.0);
+  request.pose[0].quat[1] = int16_t(data.q1 * 32768.0);
+  request.pose[0].quat[2] = int16_t(data.q2 * 32768.0);
+  request.pose[0].quat[3] = int16_t(data.q3 * 32768.0);
+  request.pose[1].id = 0;
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
