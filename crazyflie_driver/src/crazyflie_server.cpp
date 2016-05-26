@@ -419,10 +419,10 @@ public:
 
       }
 
-      ros::Time t = ros::Time::now();
-      while (ros::Time::now() < t + ros::Duration(0.03)) {
-        m_cfs[0]->sendPing();
-      }
+      // ros::Time t = ros::Time::now();
+      // while (ros::Time::now() < t + ros::Duration(0.03)) {
+      //   m_cfs[0]->sendPing();
+      // }
 
       // m_cfbc.sendPositionExternal(
       //   stateExternal);
@@ -430,7 +430,7 @@ public:
       // m_cfbc.sendPositionExternalBringup(
       //   stateExternalBringup);
 
-      // std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
       // ros::spinOnce();
     }

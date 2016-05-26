@@ -378,7 +378,7 @@ struct crtpPosExtBringup
       fp16_t x; // m
       fp16_t y; // m
       fp16_t z; // m
-      uint16_t quat[4]; //Quaternion; TODO: find more compact way to store this
+      int16_t quat[4]; //Quaternion; TODO: find more compact way to store this
                         // each component between -1 and 1
     } pose[2];
 } __attribute__((packed));
