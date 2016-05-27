@@ -9,11 +9,11 @@
       num_cfs: 1
       crazyflie1:
         uri: "radio://0/100/2M/E7E7E7E701"
-        frame: "/vicon/cf_config1/cf_config1"
+        frame: "/tracker_test1"
         id: 1
         genericLogTopics: ["log1"]
         genericLogTopicFrequencies: [10]
-        genericLogTopic_log1_Variables: ["stabilizer.x", "stabilizer.y", "stabilizer.z", "ctrlMel.zdx", "ctrlMel.zdy", "ctrlMel.zdz"]
+        genericLogTopic_log1_Variables: ["stabilizer.yaw"]
       crazyflie2:
         uri: "radio://0/80/2M/E7E7E7E702"
         frame: "/crazyflie2"
@@ -40,9 +40,13 @@
   </node>
 
   <!-- run vicon bridge -->
-<!--   <include file="$(find vicon_bridge)/launch/vicon.launch"/> -->
+  <!-- <include file="$(find vicon_bridge)/launch/vicon.launch"/> -->
 
-<!--   <node name="vicon" pkg="vicon_ros" type="vicon_node" output="screen">
+<!--   <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot2" args="/crazyflie1/log1/values[0] /crazyflie1/log1/values[1] /crazyflie1/log1/values[2]"/> -->
+
+  <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot2" args="/crazyflie1/log1/values[0]"/>
+
+  <node name="vicon" pkg="vicon_ros" type="vicon_node" output="screen">
     <param name="hostName" value="vicon" />
     <param name="enableLatencyTopic" value="true" />
     <param name="enablePointCloudTopic" value="true" />
@@ -53,6 +57,6 @@
     <rosparam command="load" file="$(find object_tracker)/launch/object_tracker.yaml" />
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find object_tracker)/launch/test.rviz"/> -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find object_tracker)/launch/test.rviz"/>
 
 </launch>

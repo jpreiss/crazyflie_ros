@@ -625,7 +625,7 @@ void CrazyflieBroadcaster::trajectoryStart()
 
 void CrazyflieBroadcaster::takeoff()
 {
-  crtpTrajectoryTakeoffRequest request(0.5, 2000);
+  crtpTrajectoryTakeoffRequest request(1.2, 2000);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
