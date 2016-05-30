@@ -21,8 +21,12 @@ if __name__ == '__main__':
     rospy.set_param("ctrlMel/ki_m_z", 100)
     rospy.set_param("ctrlMel/i_range_m_z", 100)
 
-    rospy.set_param("ctrlMel/kp_z", 0.3)
-    rospy.set_param("ctrlMel/kd_z", 0.1)
-    rospy.set_param("ctrlMel/ki_z", 0.05)
+    rospy.set_param("ctrlMel/kp_z", 1.0)
+    rospy.set_param("ctrlMel/kd_z", 0.35)
+    rospy.set_param("ctrlMel/ki_z", 0.0)
     rospy.set_param("ctrlMel/i_range_z", 1.5)
-    update_params(["flightmode/posCtrl", "ctrlMel/kp_xy", "ctrlMel/kd_xy", "ctrlMel/kR_xy", "ctrlMel/kw_xy", "ctrlMel/ki_xy", "ctrlMel/i_range_xy", "ctrlMel/kp_z", "ctrlMel/kd_z", "ctrlMel/ki_z", "ctrlMel/i_range_z", "ctrlMel/kR_z", "ctrlMel/kw_z", "ctrlMel/ki_m_z", "ctrlMel/i_range_m_z"])
+
+    rospy.set_param("ctrlMel/mass", 0.027)
+    rospy.set_param("ctrlMel/massThrust", 115000)
+
+    update_params(["flightmode/posCtrl", "ctrlMel/kp_xy", "ctrlMel/kd_xy", "ctrlMel/kR_xy", "ctrlMel/kw_xy", "ctrlMel/ki_xy", "ctrlMel/i_range_xy", "ctrlMel/kp_z", "ctrlMel/kd_z", "ctrlMel/ki_z", "ctrlMel/i_range_z", "ctrlMel/kR_z", "ctrlMel/kw_z", "ctrlMel/ki_m_z", "ctrlMel/i_range_m_z", "ctrlMel/mass", "ctrlMel/massThrust"])
