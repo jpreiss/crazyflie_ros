@@ -43,6 +43,7 @@ Crazyflie::Crazyflie(
   , m_lastTrajectoryId(0)
   , m_lastTrajectoryResponse(-1)
   , m_lastTrajectoryResponse2(-1)
+  , m_lastTrajectoryResponse3(-1)
 {
   int datarate;
   int channel;
@@ -287,27 +288,109 @@ void Crazyflie::trajectoryReset()
 }
 
 void Crazyflie::trajectoryAdd(
-    float x, float y, float z,
-    float velocity_x, float velocity_y, float velocity_z,
-    float yaw,
-    uint16_t time_from_start)
+    float duration,
+    std::vector<float> poly_x,
+    std::vector<float> poly_y,
+    std::vector<float> poly_z,
+    std::vector<float> poly_yaw)
 {
   crtpTrajectoryAddRequest request;
   request.id = m_lastTrajectoryId;
-  request.time_from_start = time_from_start;
-  request.x = x;
-  request.y = y;
-  request.z = z;
-  request.velocity_x = velocity_x;
-  request.velocity_y = velocity_y;
-  request.velocity_z = velocity_z;
-  request.yaw = (int16_t)(yaw * 1000.0);
+
+  std::cout << duration << std::endl;
+  for (size_t i = 0; i < poly_x.size(); ++i) {
+    std::cout << poly_x[i] << ",";
+  }
+  std::cout << std::endl;
+
+  // Part 1
+  request.offset = 0;
+  request.size = 7 * sizeof(float);
+  request.values[0] = duration;
+  request.values[1] = poly_x[0];
+  request.values[2] = poly_x[1];
+  request.values[3] = poly_x[2];
+  request.values[4] = poly_x[3];
+  request.values[5] = poly_x[4];
+  request.values[6] = poly_x[5];
 
   m_lastTrajectoryResponse = -1;
   do {
     sendPacket((const uint8_t*)&request, sizeof(request));
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId);
+  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
+          || m_lastTrajectoryResponse3 != request.offset);
+
+  // Part 2
+  request.offset = 7 * sizeof(float);
+  request.size = 7 * sizeof(float);
+  request.values[0] = poly_x[6];
+  request.values[1] = poly_x[7];
+  request.values[2] = poly_y[0];
+  request.values[3] = poly_y[1];
+  request.values[4] = poly_y[2];
+  request.values[5] = poly_y[3];
+  request.values[6] = poly_y[4];
+
+  m_lastTrajectoryResponse = -1;
+  do {
+    sendPacket((const uint8_t*)&request, sizeof(request));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
+          || m_lastTrajectoryResponse3 != request.offset);
+
+  // Part 3
+  request.offset = 7 * sizeof(float);
+  request.size = 7 * sizeof(float);
+  request.values[0] = poly_y[5];
+  request.values[1] = poly_y[6];
+  request.values[2] = poly_y[7];
+  request.values[3] = poly_z[0];
+  request.values[4] = poly_z[1];
+  request.values[5] = poly_z[2];
+  request.values[6] = poly_z[3];
+
+  m_lastTrajectoryResponse = -1;
+  do {
+    sendPacket((const uint8_t*)&request, sizeof(request));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
+          || m_lastTrajectoryResponse3 != request.offset);
+
+  // Part 4
+  request.offset = 14 * sizeof(float);
+  request.size = 7 * sizeof(float);
+  request.values[0] = poly_z[4];
+  request.values[1] = poly_z[5];
+  request.values[2] = poly_z[6];
+  request.values[3] = poly_z[7];
+  request.values[4] = poly_yaw[0];
+  request.values[5] = poly_yaw[1];
+  request.values[6] = poly_yaw[2];
+
+  m_lastTrajectoryResponse = -1;
+  do {
+    sendPacket((const uint8_t*)&request, sizeof(request));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
+          || m_lastTrajectoryResponse3 != request.offset);
+
+  // Part 5
+  request.offset = 21 * sizeof(float);
+  request.size = 5 * sizeof(float);
+  request.values[0] = poly_yaw[3];
+  request.values[1] = poly_yaw[4];
+  request.values[2] = poly_yaw[5];
+  request.values[3] = poly_yaw[6];
+  request.values[4] = poly_yaw[7];
+
+  m_lastTrajectoryResponse = -1;
+  do {
+    sendPacket((const uint8_t*)&request, sizeof(request));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
+          || m_lastTrajectoryResponse3 != request.offset);
+
   ++m_lastTrajectoryId;
 }
 
@@ -480,6 +563,7 @@ void Crazyflie::handleAck(
     crtpTrajectoryResponse* r = (crtpTrajectoryResponse*)result.data;
     m_lastTrajectoryResponse = r->command;
     m_lastTrajectoryResponse2 = r->cmd1;
+    m_lastTrajectoryResponse3 = r->cmd2;
   }
   else {
     crtp* header = (crtp*)result.data;

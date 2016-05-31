@@ -127,32 +127,37 @@ private:
                     std::stringstream sstr;
                     char dummy;
                     float duration, accX, accY, accZ;
-                    crazyflie_driver::QuadcopterTrajectoryPoint point;
+                    crazyflie_driver::QuadcopterTrajectoryPoly poly;
                     sstr << line;
-                    sstr >> duration >> dummy
-                         >> point.position.x >> dummy
-                         >> point.position.y >> dummy
-                         >> point.position.z >> dummy
-                         >> point.velocity.x >> dummy
-                         >> point.velocity.y >> dummy
-                         >> point.velocity.z >> dummy
-                         >> accX >> dummy
-                         >> accY >> dummy
-                         >> accZ >> dummy
-                         >> point.yaw;
-                     point.time_from_start = ros::Duration(duration);
-                     point.position.x += x_offset;
-                     point.position.y += y_offset;
-                     srv.request.points.push_back(point);
+                    sstr >> duration >> dummy;
+                    poly.poly_x.resize(8);
+                    for (size_t i = 0; i < 8; ++i) {
+                        sstr >> poly.poly_x[i] >> dummy;
+                    }
+                    poly.poly_y.resize(8);
+                    for (size_t i = 0; i < 8; ++i) {
+                        sstr >> poly.poly_y[i] >> dummy;
+                    }
+                    poly.poly_z.resize(8);
+                    for (size_t i = 0; i < 8; ++i) {
+                        sstr >> poly.poly_z[i] >> dummy;
+                    }
+                    poly.poly_yaw.resize(8);
+                    for (size_t i = 0; i < 8; ++i) {
+                        sstr >> poly.poly_yaw[i] >> dummy;
+                    }
+                    poly.duration = ros::Duration(duration);
+                  // point.position.x += x_offset;
+                    // point.position.y += y_offset;
+                    srv.request.polygons.push_back(poly);
                 }
                 firstLine = false;
             }
 
-            for (auto& point : srv.request.points) {
-                // point.time_from_start.toSec();
-                ROS_INFO("%f,%f,%f,%f,%f,%f,%f,%f", point.time_from_start.toSec(), point.position.x,
-                    point.position.y, point.position.z, point.velocity.x, point.velocity.y, point.velocity.z, point.yaw);
-            }
+            // for (auto& poly : srv.request.polygons) {
+            //     // point.time_from_start.toSec();
+            //     ROS_INFO("%f,%f,%f,%f,%f,%f,%f,%f", poly.duration.toSec(), );
+            // }
 
             ros::service::call(sstr.str() + "/upload_trajectory", srv);
         }

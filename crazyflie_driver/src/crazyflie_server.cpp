@@ -134,12 +134,13 @@ public:
 
     m_cf.trajectoryReset();
 
-    for (auto& p : req.points) {
+    for (auto& p : req.polygons) {
       m_cf.trajectoryAdd(
-        p.position.x, p.position.y, p.position.z,
-        p.velocity.x, p.velocity.y, p.velocity.z,
-        p.yaw,
-        p.time_from_start.toSec() * 1000);
+        p.duration.toSec(),
+        p.poly_x,
+        p.poly_y,
+        p.poly_z,
+        p.poly_yaw);
     }
 
     ROS_INFO("[%s] Uploaded trajectory", m_frame.c_str());
@@ -258,12 +259,13 @@ public:
     size_t i = 0;
     for (auto& logBlock : m_logBlocks)
     {
-      std::function<void(std::vector<double>*, void* userData)> cb =
+      std::function<void(uint32_t, std::vector<double>*, void* userData)> cb =
         std::bind(
           &CrazyflieROS::onLogCustom,
           this,
           std::placeholders::_1,
-          std::placeholders::_2);
+          std::placeholders::_2,
+          std::placeholders::_3);
 
       m_logBlocksGeneric[i].reset(new LogBlockGeneric(
         &m_cf,
@@ -295,11 +297,12 @@ public:
       }
   }
 
-  void onLogCustom(std::vector<double>* values, void* userData) {
+  void onLogCustom(uint32_t time_in_ms, std::vector<double>* values, void* userData) {
 
     ros::Publisher* pub = reinterpret_cast<ros::Publisher*>(userData);
 
     crazyflie_driver::GenericLogData msg;
+    msg.header.stamp = ros::Time(time_in_ms/1000.0);
     msg.values = *values;
 
     pub->publish(msg);
@@ -366,7 +369,7 @@ public:
     ROS_INFO("Waiting for transforms...");
 
     for (auto cf : m_cfs) {
-      m_listener.waitForTransform(m_worldFrame, cf->frame(), ros::Time(0), ros::Duration(10.0) );
+      m_listener.waitForTransform(m_worldFrame, cf->frame(), ros::Time(0), ros::Duration(1000.0) );
     }
 
     ROS_INFO("Found all transforms!");

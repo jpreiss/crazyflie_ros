@@ -427,14 +427,9 @@ struct crtpTrajectoryAddRequest
     const crtp header;
     const uint8_t command;
     uint8_t id;
-    uint16_t time_from_start; // ms; 0 marks the beginning of the execution
-    float x; // m
-    float y; // m
-    float z; // m
-    float velocity_x; // m/s
-    float velocity_y; // m/s
-    float velocity_z; // m/s
-    int16_t yaw; // rad * 1000
+    uint8_t offset;
+    uint8_t size;
+    float values[7];
 } __attribute__((packed));
 
 struct crtpTrajectoryStartRequest
@@ -502,13 +497,14 @@ struct crtpTrajectoryLandRequest
 struct crtpTrajectoryResponse
 {
     static bool match(const Crazyradio::Ack& response) {
-      return response.size == 4
+      return response.size == 5
         && crtp(response.data[0]) == crtp(14, 1);
     }
 
     const crtp header;
     const uint8_t command;
     const uint8_t cmd1;
+    const uint8_t cmd2;
     const uint8_t result;
 } __attribute__((packed));
 

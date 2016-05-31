@@ -113,10 +113,11 @@ public:
 
   void trajectoryReset();
   void trajectoryAdd(
-    float x, float y, float z,
-    float velocity_x, float velocity_y, float velocity_z,
-    float yaw,
-    uint16_t time_from_start);
+    float duration,
+    std::vector<float> poly_x,
+    std::vector<float> poly_y,
+    std::vector<float> poly_z,
+    std::vector<float> poly_yaw);
   // void trajectoryStart();
   // void setTrajectoryState(bool state);
 
@@ -234,6 +235,7 @@ private:
   uint16_t m_lastTrajectoryId;
   int m_lastTrajectoryResponse;
   int m_lastTrajectoryResponse2;
+  int m_lastTrajectoryResponse3;
 
   template<typename T>
   friend class LogBlock;
@@ -325,7 +327,7 @@ public:
     Crazyflie* cf,
     const std::vector<std::string>& variables,
     void* userData,
-    std::function<void(std::vector<double>*, void* userData)>& callback)
+    std::function<void(uint32_t time_in_ms, std::vector<double>*, void* userData)>& callback)
     : m_cf(cf)
     , m_userData(userData)
     , m_callback(callback)
@@ -458,13 +460,14 @@ private:
       }
     }
 
-    m_callback(&result, m_userData);
+    uint32_t time_in_ms = (response->timestampHi << 16) + response->timestampLo;
+    m_callback(time_in_ms, &result, m_userData);
   }
 
 private:
   Crazyflie* m_cf;
   void* m_userData;
-  std::function<void(std::vector<double>*, void*)> m_callback;
+  std::function<void(uint32_t, std::vector<double>*, void*)> m_callback;
   uint8_t m_id;
   std::vector<Crazyflie::LogType> m_types;
 };

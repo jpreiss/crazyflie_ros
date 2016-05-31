@@ -41,6 +41,7 @@ add_message_files(
   LogBlock.msg
   GenericLogData.msg
   QuadcopterTrajectoryPoint.msg
+  QuadcopterTrajectoryPoly.msg
 )
 
 ## Generate added messages and services with any dependencies listed here
