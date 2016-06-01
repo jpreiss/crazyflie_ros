@@ -427,9 +427,9 @@ struct crtpTrajectoryAddRequest
     const crtp header;
     const uint8_t command;
     uint8_t id;
-    uint8_t offset;
-    uint8_t size;
-    float values[7];
+    uint8_t offset:5;
+    uint8_t size:3;
+    float values[6];
 } __attribute__((packed));
 
 struct crtpTrajectoryStartRequest

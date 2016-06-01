@@ -114,9 +114,11 @@ private:
             std::string csvFile;
             double x_offset;
             double y_offset;
+            double z_offset;
             n.getParam(sstr.str() + "/csv_file", csvFile);
             n.getParam(sstr.str() + "/x_offset", x_offset);
             n.getParam(sstr.str() + "/y_offset", y_offset);
+            n.getParam(sstr.str() + "/z_offset", z_offset);
 
             crazyflie_driver::UploadTrajectory srv;
 
@@ -147,6 +149,9 @@ private:
                         sstr >> poly.poly_yaw[i] >> dummy;
                     }
                     poly.duration = ros::Duration(duration);
+                    poly.poly_x[0] += x_offset;
+                    poly.poly_y[0] += y_offset;
+                    poly.poly_z[0] += z_offset;
                   // point.position.x += x_offset;
                     // point.position.y += y_offset;
                     srv.request.polygons.push_back(poly);

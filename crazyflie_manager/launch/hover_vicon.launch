@@ -34,6 +34,7 @@
     <param name="crazyflie1/csv_file" value="$(find crazyflie_demo)/scripts/figure8.csv" />
     <param name="crazyflie1/x_offset" value="0.0" />
     <param name="crazyflie1/y_offset" value="0.0" />
+    <param name="crazyflie1/z_offset" value="1.0" />
     <param name="crazyflie2/csv_file" value="$(find crazyflie_demo)/scripts/figure8.csv" />
     <param name="crazyflie2/x_offset" value="0.0" />
     <param name="crazyflie2/y_offset" value="-0.75" />
@@ -44,7 +45,7 @@
 
 <!--   <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot2" args="/crazyflie1/log1/values[0] /crazyflie1/log1/values[1] /crazyflie1/log1/values[2]"/> -->
 
-<!--   <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot2" args="/crazyflie1/log1/values[0] /crazyflie1/log1/values[1]"/>
+  <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot2" args="/crazyflie1/log1/values[0] /crazyflie1/log1/values[1]"/>
 
   <node name="vicon" pkg="vicon_ros" type="vicon_node" output="screen">
     <param name="hostName" value="vicon" />
@@ -57,6 +58,6 @@
     <rosparam command="load" file="$(find object_tracker)/launch/object_tracker.yaml" />
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find object_tracker)/launch/test.rviz"/> -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find object_tracker)/launch/test.rviz"/>
 
 </launch>
