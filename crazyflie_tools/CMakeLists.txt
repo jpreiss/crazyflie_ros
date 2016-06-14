@@ -50,18 +50,42 @@ target_link_libraries(scan
   ${Boost_LIBRARIES}
 )
 
-###################
-
-add_executable(broadcast_test
-  src/broadcast_test.cpp
+### listParams
+add_executable(listParams
+  src/listParams.cpp
 )
-
-## Specify libraries to link a library or executable target against
-target_link_libraries(broadcast_test
+target_link_libraries(listParams
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
 )
 
+### listLogVariables
+add_executable(listLogVariables
+  src/listLogVariables.cpp
+)
+target_link_libraries(listLogVariables
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
+### reboot
+add_executable(reboot
+  src/reboot.cpp
+)
+target_link_libraries(reboot
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
+### broadcast_test
+
+add_executable(broadcast_test
+  src/broadcast_test.cpp
+)
+target_link_libraries(broadcast_test
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
 
 #############
 ## Install ##

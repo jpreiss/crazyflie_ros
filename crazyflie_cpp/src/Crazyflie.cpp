@@ -77,11 +77,14 @@ Crazyflie::Crazyflie(
       throw std::runtime_error("This version does not support that many radios. Adjust MAX_RADIOS and recompile!");
     }
 
-    if (!g_crazyradios[m_devId]) {
-      g_crazyradios[m_devId] = new Crazyradio(m_devId);
-      // g_crazyradios[m_devId]->setAckEnable(false);
-      g_crazyradios[m_devId]->setAckEnable(true);
-      g_crazyradios[m_devId]->setArc(0);
+    {
+      std::unique_lock<std::mutex> mlock(g_mutex[m_devId]);
+      if (!g_crazyradios[m_devId]) {
+        g_crazyradios[m_devId] = new Crazyradio(m_devId);
+        // g_crazyradios[m_devId]->setAckEnable(false);
+        g_crazyradios[m_devId]->setAckEnable(true);
+        g_crazyradios[m_devId]->setArc(0);
+      }
     }
 
     m_radio = g_crazyradios[m_devId];
@@ -117,16 +120,23 @@ void Crazyflie::sendPing()
   sendPacket(&ping, sizeof(ping));
 }
 
+// https://forum.bitcraze.io/viewtopic.php?f=9&t=1488
 void Crazyflie::reboot()
 {
   const uint8_t reboot_init[] = {0xFF, 0xFE, 0xFF};
-  sendPacket(reboot_init, sizeof(reboot_init));
-
-  // const uint8_t reboot_to_bootloader[] = {0xFF, 0xFE, 0xF0, 0x00};
-  //
+  while(!sendPacket(reboot_init, sizeof(reboot_init))) {}
 
   const uint8_t reboot_to_firmware[] = {0xFF, 0xFE, 0xF0, 0x01};
-  sendPacket(reboot_to_firmware, sizeof(reboot_to_firmware));
+  while(!sendPacket(reboot_to_firmware, sizeof(reboot_to_firmware))) {}
+}
+
+void Crazyflie::rebootToBootloader()
+{
+  const uint8_t reboot_init[] = {0xFF, 0xFE, 0xFF};
+  while(!sendPacket(reboot_init, sizeof(reboot_init))) {}
+
+  const uint8_t reboot_to_bootloader[] = {0xFF, 0xFE, 0xF0, 0x00};
+  while(!sendPacket(reboot_to_bootloader, sizeof(reboot_to_bootloader))) {}
 }
 
 void Crazyflie::requestLogToc()
@@ -442,7 +452,7 @@ void Crazyflie::sendPositionExternalBringup(
 }
 
 
-void Crazyflie::sendPacket(
+bool Crazyflie::sendPacket(
   const uint8_t* data,
   uint32_t length)
 {
@@ -483,7 +493,7 @@ void Crazyflie::sendPacket(
     numPackets = 0;
     numAcks = 0;
   }
-
+  return ack.ack;
 }
 
 void Crazyflie::handleAck(

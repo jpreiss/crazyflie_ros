@@ -56,6 +56,23 @@ public:
     float valueFloat;
   };
 
+  enum LogType {
+    LogTypeUint8  = 1,
+    LogTypeUint16 = 2,
+    LogTypeUint32 = 3,
+    LogTypeInt8   = 4,
+    LogTypeInt16  = 5,
+    LogTypeInt32  = 6,
+    LogTypeFloat  = 7,
+    LogTypeFP16   = 8,
+  };
+
+  struct LogTocEntry {
+    uint8_t id;
+    LogType type;
+    std::string group;
+    std::string name;
+  };
 
 public:
   Crazyflie(
@@ -72,6 +89,7 @@ public:
   void sendPing();
 
   void reboot();
+  void rebootToBootloader();
 
   void requestLogToc();
 
@@ -82,6 +100,13 @@ public:
   }
   std::vector<ParamTocEntry>::const_iterator paramsEnd() const {
     return m_paramTocEntries.end();
+  }
+
+  std::vector<LogTocEntry>::const_iterator logVariablesBegin() const {
+    return m_logTocEntries.begin();
+  }
+  std::vector<LogTocEntry>::const_iterator logVariablesEnd() const {
+    return m_logTocEntries.end();
   }
 
   template<class T>
@@ -125,7 +150,7 @@ public:
     const stateExternalBringup& data);
 
 protected:
-  void sendPacket(
+  bool sendPacket(
     const uint8_t* data,
     uint32_t length);
 
@@ -138,24 +163,6 @@ private:
     uint32_t log_crc;
     uint8_t log_max_packet;
     uint8_t log_max_ops;
-  };
-
-  enum LogType {
-    LogTypeUint8  = 1,
-    LogTypeUint16 = 2,
-    LogTypeUint32 = 3,
-    LogTypeInt8   = 4,
-    LogTypeInt16  = 5,
-    LogTypeInt32  = 6,
-    LogTypeFloat  = 7,
-    LogTypeFP16   = 8,
-  };
-
-  struct LogTocEntry {
-    uint8_t id;
-    LogType type;
-    std::string group;
-    std::string name;
   };
 
   /////////
@@ -249,7 +256,7 @@ public:
   LogBlock(
     Crazyflie* cf,
     std::list<std::pair<std::string, std::string> > variables,
-    std::function<void(T*)>& callback)
+    std::function<void(uint32_t, T*)>& callback)
     : m_cf(cf)
     , m_callback(callback)
     , m_id(0)
@@ -304,8 +311,9 @@ public:
 private:
   void handleData(crtpLogDataResponse* response, uint8_t size) {
     if (size == sizeof(T)) {
+      uint32_t time_in_ms = ((uint32_t)response->timestampHi << 8) | (response->timestampLo);
       T* t = (T*)response->data;
-      m_callback(t);
+      m_callback(time_in_ms, t);
     }
     else {
       std::cerr << "Size doesn't match!" << std::endl;
@@ -314,7 +322,7 @@ private:
 
 private:
   Crazyflie* m_cf;
-  std::function<void(T*)> m_callback;
+  std::function<void(uint32_t, T*)> m_callback;
   uint8_t m_id;
 };
 
@@ -327,7 +335,7 @@ public:
     Crazyflie* cf,
     const std::vector<std::string>& variables,
     void* userData,
-    std::function<void(uint32_t time_in_ms, std::vector<double>*, void* userData)>& callback)
+    std::function<void(uint32_t, std::vector<double>*, void* userData)>& callback)
     : m_cf(cf)
     , m_userData(userData)
     , m_callback(callback)
@@ -460,7 +468,7 @@ private:
       }
     }
 
-    uint32_t time_in_ms = (response->timestampHi << 16) + response->timestampLo;
+    uint32_t time_in_ms = ((uint32_t)response->timestampHi << 8) | (response->timestampLo);
     m_callback(time_in_ms, &result, m_userData);
   }
 
