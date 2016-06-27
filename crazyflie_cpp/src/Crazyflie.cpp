@@ -291,7 +291,10 @@ void Crazyflie::trajectoryReset()
   m_lastTrajectoryResponse = -1;
   do {
     crtpTrajectoryResetRequest request;
-    sendPacket((const uint8_t*)&request, sizeof(request));
+    bool ok = sendPacket((const uint8_t*)&request, sizeof(request));
+    if (ok) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   } while (m_lastTrajectoryResponse != 0);
   m_lastTrajectoryId = 0;
@@ -307,11 +310,11 @@ void Crazyflie::trajectoryAdd(
   crtpTrajectoryAddRequest request;
   request.id = m_lastTrajectoryId;
 
-  std::cout << duration << std::endl;
-  for (size_t i = 0; i < poly_x.size(); ++i) {
-    std::cout << poly_x[i] << ",";
-  }
-  std::cout << std::endl;
+  // std::cout << duration << std::endl;
+  // for (size_t i = 0; i < poly_x.size(); ++i) {
+  //   std::cout << poly_x[i] << ",";
+  // }
+  // std::cout << std::endl;
 
   // Part 1
   request.offset = 0;
@@ -325,7 +328,10 @@ void Crazyflie::trajectoryAdd(
 
   m_lastTrajectoryResponse = -1;
   do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
+    bool ok = sendPacket((const uint8_t*)&request, sizeof(request));
+    if (ok) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
           || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
@@ -342,7 +348,10 @@ void Crazyflie::trajectoryAdd(
 
   m_lastTrajectoryResponse = -1;
   do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
+    bool ok = sendPacket((const uint8_t*)&request, sizeof(request));
+    if (ok) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
           || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
@@ -359,7 +368,10 @@ void Crazyflie::trajectoryAdd(
 
   m_lastTrajectoryResponse = -1;
   do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
+    bool ok = sendPacket((const uint8_t*)&request, sizeof(request));
+    if (ok) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
           || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
@@ -376,7 +388,10 @@ void Crazyflie::trajectoryAdd(
 
   m_lastTrajectoryResponse = -1;
   do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
+    bool ok = sendPacket((const uint8_t*)&request, sizeof(request));
+    if (ok) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
           || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
@@ -393,7 +408,10 @@ void Crazyflie::trajectoryAdd(
 
   m_lastTrajectoryResponse = -1;
   do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
+    bool ok = sendPacket((const uint8_t*)&request, sizeof(request));
+    if (ok) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
           || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
@@ -407,7 +425,10 @@ void Crazyflie::trajectoryAdd(
 
   m_lastTrajectoryResponse = -1;
   do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
+    bool ok = sendPacket((const uint8_t*)&request, sizeof(request));
+    if (ok) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
           || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
