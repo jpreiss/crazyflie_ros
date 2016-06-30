@@ -480,6 +480,30 @@ struct crtpTrajectoryLandRequest
     uint16_t time_from_start; // ms
 } __attribute__((packed));
 
+struct crtpTrajectoryHoverRequest
+{
+  crtpTrajectoryHoverRequest(
+    float x,
+    float y,
+    float z,
+    float yaw)
+    : header(14, 1)
+    , command(6)
+    , x(x)
+    , y(y)
+    , z(z)
+    , yaw(yaw)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+    float x; // m
+    float y; // m
+    float z; // m
+    float yaw; // deg
+} __attribute__((packed));
+
 // struct crtpTrajectoryStateRequest
 // {
 //   crtpTrajectoryStateRequest(uint8_t state)

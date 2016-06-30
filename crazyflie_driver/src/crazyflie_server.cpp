@@ -13,6 +13,10 @@
 #include "sensor_msgs/MagneticField.h"
 #include "std_msgs/Float32.h"
 
+#include <sensor_msgs/Joy.h>
+
+#include "vicon_ros/NamedPoseArray.h"
+
 //#include <regex>
 #include <thread>
 #include <mutex>
@@ -58,6 +62,8 @@ public:
     {
       m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(tf_prefix + "/" + logBlock.topic_name, 10));
     }
+
+    m_subscribeJoy = n.subscribe("/joy", 1, &CrazyflieROS::joyChanged, this);
   }
 
   const std::string& frame() const {
@@ -72,6 +78,41 @@ public:
     m_cf.sendPing();
   }
 
+  void joyChanged(
+        const sensor_msgs::Joy::ConstPtr& msg)
+  {
+    static float x = 0.0;
+    static float y = 0.0;
+    static float z = 1.0;
+    static float yaw = 0;
+    bool changed = false;
+
+    float dx = msg->axes[4];
+    if (fabs(dx) > 0.1) {
+      x += dx * 0.01;
+      changed = true;
+    }
+    float dy = msg->axes[3];
+    if (fabs(dy) > 0.1) {
+      y += dy * 0.01;
+      changed = true;
+    }
+    float dz = msg->axes[1];
+    if (fabs(dz) > 0.1) {
+      z += dz * 0.01;
+      changed = true;
+    }
+    float dyaw = msg->axes[0];
+    if (fabs(dyaw) > 0.1) {
+      yaw += dyaw * 1.0;
+      changed = true;
+    }
+
+    if (changed) {
+      ROS_INFO("[%f, %f, %f, %f]", x, y, z, yaw);
+      m_cf.trajectoryHover(x, y, z, yaw);
+    }
+  }
 
 public:
 
@@ -324,6 +365,8 @@ private:
   std::vector<crazyflie_driver::LogBlock> m_logBlocks;
   std::vector<ros::Publisher> m_pubLogDataGeneric;
   std::vector<std::unique_ptr<LogBlockGeneric> > m_logBlocksGeneric;
+
+  ros::Subscriber m_subscribeJoy;
 };
 
 class CrazyflieServer
@@ -349,6 +392,8 @@ public:
     m_serviceStartTrajectory = n.advertiseService("start_trajectory", &CrazyflieServer::startTrajectory, this);
     m_serviceTakeoff = n.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
     m_serviceLand = n.advertiseService("land", &CrazyflieServer::land, this);
+
+    m_subscribePoses = n.subscribe("/vicon/poses", 1, &CrazyflieServer::posesChanged, this);
   }
 
   ~CrazyflieServer()
@@ -358,86 +403,113 @@ public:
     }
   }
 
-  void start()
+  void posesChanged(
+    const vicon_ros::NamedPoseArray::ConstPtr& msg)
   {
-    std::thread t(&CrazyflieServer::run, this);
-    t.detach();
+    if (msg->poses.size() == 1) {
+      stateExternalBringup stateExternalBringup;
+      stateExternalBringup.id = m_cfs[0]->id();
+      stateExternalBringup.x = msg->poses[0].pose.position.x;
+      stateExternalBringup.y = msg->poses[0].pose.position.y;
+      stateExternalBringup.z = msg->poses[0].pose.position.z;
+      stateExternalBringup.q0 = msg->poses[0].pose.orientation.x;
+      stateExternalBringup.q1 = msg->poses[0].pose.orientation.y;
+      stateExternalBringup.q2 = msg->poses[0].pose.orientation.z;
+      stateExternalBringup.q3 = msg->poses[0].pose.orientation.w;
+
+      m_cfs[0]->sendPositionExternalBringup(
+        stateExternalBringup);
+    }
   }
+
+  // void start()
+  // {
+  //   std::thread t(&CrazyflieServer::run, this);
+  //   t.detach();
+  // }
 
   void run()
   {
-    ROS_INFO("Waiting for transforms...");
-
-    for (auto cf : m_cfs) {
-      m_listener.waitForTransform(m_worldFrame, cf->frame(), ros::Time(0), ros::Duration(1000.0) );
-    }
-
-    ROS_INFO("Found all transforms!");
-
-    // m_numCFs = 25;
-    // std::vector<CrazyflieBroadcaster::stateExternal> stateExternal(m_numCFs);
-    stateExternalBringup stateExternalBringup;
-
-    // for (size_t i = 0; i < m_numCFs; ++i) {
-    //   stateExternal[i].x = i + 0.1;
-    //   stateExternal[i].y = i + 0.2;
-    //   stateExternal[i].z = i + 0.3;
-    //   stateExternal[i].yaw = i + 0.4;
-    // }
-
     while(ros::ok() && !m_isEmergency) {
-
-      // for (size_t i = 0; i < m_numCFs; ++i) {
-      //   stateExternal[i].x += 1.0;
-      //   stateExternal[i].y += 1.0;
-      //   stateExternal[i].z += 1.0;
-      //   stateExternal[i].yaw += 1.0;
-      // }
-
-      for (size_t i = 0; i < m_numCFs; ++i) {
-        tf::StampedTransform transform;
-        m_listener.lookupTransform(m_worldFrame, m_cfs[i]->frame(), ros::Time(0), transform);
-
-        // tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
-        // tf::Matrix3x3(transform.getRotation()).getRPY(
-        //     current_euler_roll,
-        //     current_euler_pitch,
-        //     current_euler_yaw);
-
-        stateExternalBringup.id = m_cfs[i]->id();
-        // stateExternal[i].x = transform.getOrigin().x();
-        // stateExternal[i].y = transform.getOrigin().y();
-        // stateExternal[i].z = transform.getOrigin().z();
-        // stateExternal[i].yaw = atan2(sin(current_euler_yaw), cos(current_euler_yaw));
-        stateExternalBringup.x = transform.getOrigin().x();
-        stateExternalBringup.y = transform.getOrigin().y();
-        stateExternalBringup.z = transform.getOrigin().z();
-        stateExternalBringup.q0 = transform.getRotation().x();
-        stateExternalBringup.q1 = transform.getRotation().y();
-        stateExternalBringup.q2 = transform.getRotation().z();
-        stateExternalBringup.q3 = transform.getRotation().w();
-
-        m_cfs[i]->sendPositionExternalBringup(
-          stateExternalBringup);
-
-      }
-
-      // ros::Time t = ros::Time::now();
-      // while (ros::Time::now() < t + ros::Duration(0.03)) {
-      //   m_cfs[0]->sendPing();
-      // }
-
-      // m_cfbc.sendPositionExternal(
-      //   stateExternal);
-
-      // m_cfbc.sendPositionExternalBringup(
-      //   stateExternalBringup);
-
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-      // ros::spinOnce();
+      m_cfs[0]->sendPing();
+      ros::spinOnce();
     }
   }
+
+  // void run()
+  // {
+  //   ROS_INFO("Waiting for transforms...");
+
+  //   for (auto cf : m_cfs) {
+  //     m_listener.waitForTransform(m_worldFrame, cf->frame(), ros::Time(0), ros::Duration(1000.0) );
+  //   }
+
+  //   ROS_INFO("Found all transforms!");
+
+  //   // m_numCFs = 25;
+  //   // std::vector<CrazyflieBroadcaster::stateExternal> stateExternal(m_numCFs);
+  //   stateExternalBringup stateExternalBringup;
+
+  //   // for (size_t i = 0; i < m_numCFs; ++i) {
+  //   //   stateExternal[i].x = i + 0.1;
+  //   //   stateExternal[i].y = i + 0.2;
+  //   //   stateExternal[i].z = i + 0.3;
+  //   //   stateExternal[i].yaw = i + 0.4;
+  //   // }
+
+  //   while(ros::ok() && !m_isEmergency) {
+
+  //     // for (size_t i = 0; i < m_numCFs; ++i) {
+  //     //   stateExternal[i].x += 1.0;
+  //     //   stateExternal[i].y += 1.0;
+  //     //   stateExternal[i].z += 1.0;
+  //     //   stateExternal[i].yaw += 1.0;
+  //     // }
+
+  //     for (size_t i = 0; i < m_numCFs; ++i) {
+  //       tf::StampedTransform transform;
+  //       m_listener.lookupTransform(m_worldFrame, m_cfs[i]->frame(), ros::Time(0), transform);
+
+  //       // tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
+  //       // tf::Matrix3x3(transform.getRotation()).getRPY(
+  //       //     current_euler_roll,
+  //       //     current_euler_pitch,
+  //       //     current_euler_yaw);
+
+  //       stateExternalBringup.id = m_cfs[i]->id();
+  //       // stateExternal[i].x = transform.getOrigin().x();
+  //       // stateExternal[i].y = transform.getOrigin().y();
+  //       // stateExternal[i].z = transform.getOrigin().z();
+  //       // stateExternal[i].yaw = atan2(sin(current_euler_yaw), cos(current_euler_yaw));
+  //       stateExternalBringup.x = transform.getOrigin().x();
+  //       stateExternalBringup.y = transform.getOrigin().y();
+  //       stateExternalBringup.z = transform.getOrigin().z();
+  //       stateExternalBringup.q0 = transform.getRotation().x();
+  //       stateExternalBringup.q1 = transform.getRotation().y();
+  //       stateExternalBringup.q2 = transform.getRotation().z();
+  //       stateExternalBringup.q3 = transform.getRotation().w();
+
+  //       m_cfs[i]->sendPositionExternalBringup(
+  //         stateExternalBringup);
+
+  //     }
+
+  //     // ros::Time t = ros::Time::now();
+  //     // while (ros::Time::now() < t + ros::Duration(0.03)) {
+  //     //   m_cfs[0]->sendPing();
+  //     // }
+
+  //     // m_cfbc.sendPositionExternal(
+  //     //   stateExternal);
+
+  //     // m_cfbc.sendPositionExternalBringup(
+  //     //   stateExternalBringup);
+
+  //     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+  //     // ros::spinOnce();
+  //   }
+  // }
 
   void addCrazyflie(
     const std::string& uri,
@@ -521,6 +593,7 @@ private:
   ros::ServiceServer m_serviceStartTrajectory;
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
+  ros::Subscriber m_subscribePoses;
 
   std::vector<CrazyflieROS*> m_cfs;
 
@@ -580,11 +653,11 @@ int main(int argc, char **argv)
   }
   ROS_INFO("All CFs are ready!");
 
-  server.start();
+  // server.start();
 
-  // server.run();
+  server.run();
 
-  ros::spin();
+  // ros::spin();
 
   return 0;
 }

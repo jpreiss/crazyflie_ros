@@ -21,12 +21,15 @@ if __name__ == '__main__':
     rospy.set_param("ctrlMel/ki_m_z", 100)
     rospy.set_param("ctrlMel/i_range_m_z", 100)
 
-    rospy.set_param("ctrlMel/kp_z", 1.0)
-    rospy.set_param("ctrlMel/kd_z", 0.35)
-    rospy.set_param("ctrlMel/ki_z", 0.0)
+    rospy.set_param("ctrlMel/kp_z", 0.9)
+    rospy.set_param("ctrlMel/kd_z", 0.5)
+    rospy.set_param("ctrlMel/ki_z", 0.2)
     rospy.set_param("ctrlMel/i_range_z", 1.5)
 
-    rospy.set_param("ctrlMel/mass", 0.027)
+    rospy.set_param("ctrlMel/mass", 0.032)
     rospy.set_param("ctrlMel/massThrust", 115000)
 
-    update_params(["flightmode/posCtrl", "ctrlMel/kp_xy", "ctrlMel/kd_xy", "ctrlMel/kR_xy", "ctrlMel/kw_xy", "ctrlMel/ki_xy", "ctrlMel/i_range_xy", "ctrlMel/kp_z", "ctrlMel/kd_z", "ctrlMel/ki_z", "ctrlMel/i_range_z", "ctrlMel/kR_z", "ctrlMel/kw_z", "ctrlMel/ki_m_z", "ctrlMel/i_range_m_z", "ctrlMel/mass", "ctrlMel/massThrust"])
+    rospy.set_param("ring/effect", 6)
+    rospy.set_param("ring/headlightEnable", 0)
+
+    update_params(["flightmode/posCtrl", "ctrlMel/kp_xy", "ctrlMel/kd_xy", "ctrlMel/kR_xy", "ctrlMel/kw_xy", "ctrlMel/ki_xy", "ctrlMel/i_range_xy", "ctrlMel/kp_z", "ctrlMel/kd_z", "ctrlMel/ki_z", "ctrlMel/i_range_z", "ctrlMel/kR_z", "ctrlMel/kw_z", "ctrlMel/ki_m_z", "ctrlMel/i_range_m_z", "ctrlMel/mass", "ctrlMel/massThrust", "ring/effect", "ring/headlightEnable"])

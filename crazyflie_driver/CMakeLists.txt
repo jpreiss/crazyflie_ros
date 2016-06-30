@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
   crazyflie_cpp
+  vicon_ros
 )
 
 # Enable C++11

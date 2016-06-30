@@ -415,6 +415,16 @@ void Crazyflie::trajectoryAdd(
   ++m_lastTrajectoryId;
 }
 
+void Crazyflie::trajectoryHover(
+    float x,
+    float y,
+    float z,
+    float yaw)
+{
+  crtpTrajectoryHoverRequest request(x, y, z, yaw);
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
 // void Crazyflie::trajectoryStart()
 // {
 //   m_lastTrajectoryResponse = -1;

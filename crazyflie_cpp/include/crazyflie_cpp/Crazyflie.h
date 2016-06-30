@@ -146,6 +146,12 @@ public:
   // void trajectoryStart();
   // void setTrajectoryState(bool state);
 
+  void trajectoryHover(
+    float x,
+    float y,
+    float z,
+    float yaw);
+
   void sendPositionExternalBringup(
     const stateExternalBringup& data);
 
