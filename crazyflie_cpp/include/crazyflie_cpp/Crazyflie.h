@@ -290,9 +290,6 @@ private:
   std::function<void(float)> m_linkQualityCallback;
 
   uint16_t m_lastTrajectoryId;
-  int m_lastTrajectoryResponse;
-  int m_lastTrajectoryResponse2;
-  int m_lastTrajectoryResponse3;
 
   template<typename T>
   friend class LogBlock;

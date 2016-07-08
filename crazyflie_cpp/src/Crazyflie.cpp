@@ -39,9 +39,6 @@ Crazyflie::Crazyflie(
   , m_emptyAckCallback(nullptr)
   , m_linkQualityCallback(nullptr)
   , m_lastTrajectoryId(0)
-  , m_lastTrajectoryResponse(-1)
-  , m_lastTrajectoryResponse2(-1)
-  , m_lastTrajectoryResponse3(-1)
 {
   int datarate;
   int channel;
@@ -284,12 +281,10 @@ void Crazyflie::setParam(uint8_t id, const ParamValue& value) {
 
 void Crazyflie::trajectoryReset()
 {
-  m_lastTrajectoryResponse = -1;
-  do {
-    crtpTrajectoryResetRequest request;
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  } while (m_lastTrajectoryResponse != 0);
+  crtpTrajectoryResetRequest request;
+  startBatchRequest();
+  addRequest(request, 1);
+  handleRequests();
   m_lastTrajectoryId = 0;
 }
 
@@ -309,6 +304,8 @@ void Crazyflie::trajectoryAdd(
   }
   std::cout << std::endl;
 
+  startBatchRequest();
+
   // Part 1
   request.offset = 0;
   request.size = 6;
@@ -318,13 +315,7 @@ void Crazyflie::trajectoryAdd(
   request.values[3] = poly_x[2];
   request.values[4] = poly_x[3];
   request.values[5] = poly_x[4];
-
-  m_lastTrajectoryResponse = -1;
-  do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
-          || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
+  addRequest(request, 3);
 
   // Part 2
   request.offset = 6;
@@ -335,13 +326,7 @@ void Crazyflie::trajectoryAdd(
   request.values[3] = poly_y[0];
   request.values[4] = poly_y[1];
   request.values[5] = poly_y[2];
-
-  m_lastTrajectoryResponse = -1;
-  do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
-          || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
+  addRequest(request, 3);
 
   // Part 3
   request.offset = 12;
@@ -352,13 +337,7 @@ void Crazyflie::trajectoryAdd(
   request.values[3] = poly_y[6];
   request.values[4] = poly_y[7];
   request.values[5] = poly_z[0];
-
-  m_lastTrajectoryResponse = -1;
-  do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
-          || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
+  addRequest(request, 3);
 
   // Part 4
   request.offset = 18;
@@ -369,13 +348,7 @@ void Crazyflie::trajectoryAdd(
   request.values[3] = poly_z[4];
   request.values[4] = poly_z[5];
   request.values[5] = poly_z[6];
-
-  m_lastTrajectoryResponse = -1;
-  do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
-          || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
+  addRequest(request, 3);
 
   // Part 5
   request.offset = 24;
@@ -386,13 +359,7 @@ void Crazyflie::trajectoryAdd(
   request.values[3] = poly_yaw[2];
   request.values[4] = poly_yaw[3];
   request.values[5] = poly_yaw[4];
-
-  m_lastTrajectoryResponse = -1;
-  do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
-          || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
+  addRequest(request, 3);
 
   // Part 6
   request.offset = 30;
@@ -400,13 +367,9 @@ void Crazyflie::trajectoryAdd(
   request.values[0] = poly_yaw[5];
   request.values[1] = poly_yaw[6];
   request.values[2] = poly_yaw[7];
+  addRequest(request, 3);
 
-  m_lastTrajectoryResponse = -1;
-  do {
-    sendPacket((const uint8_t*)&request, sizeof(request));
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (m_lastTrajectoryResponse != 1 || m_lastTrajectoryResponse2 != m_lastTrajectoryId
-          || m_lastTrajectoryResponse3 != ((const uint8_t*)&request)[3]);
+  handleRequests();
 
   ++m_lastTrajectoryId;
 }
@@ -558,10 +521,7 @@ void Crazyflie::handleAck(
     }
   }
   else if (crtpTrajectoryResponse::match(result)) {
-    crtpTrajectoryResponse* r = (crtpTrajectoryResponse*)result.data;
-    m_lastTrajectoryResponse = r->command;
-    m_lastTrajectoryResponse2 = r->cmd1;
-    m_lastTrajectoryResponse3 = r->cmd2;
+    // handled in batch system
   }
   else {
     crtp* header = (crtp*)result.data;
