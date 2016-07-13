@@ -801,22 +801,32 @@ void CrazyflieBroadcaster::sendPositionExternalBringup(
   const std::vector<stateExternalBringup>& data)
 {
   crtpPosExtBringup request;
-  request.pose[0].id = 0;
-  request.pose[1].id = 0;
   for (size_t i = 0; i < data.size(); ++i) {
-    request.pose[i%2].id = data[i].id;
-    request.pose[i%2].x = single2half(data[i].x);
-    request.pose[i%2].y = single2half(data[i].y);
-    request.pose[i%2].z = single2half(data[i].z);
-    request.pose[i%2].quat[0] = int16_t(data[i].q0 * 32768.0);
-    request.pose[i%2].quat[1] = int16_t(data[i].q1 * 32768.0);
-    request.pose[i%2].quat[2] = int16_t(data[i].q2 * 32768.0);
-    request.pose[i%2].quat[3] = int16_t(data[i].q3 * 32768.0);
-    if (i%2 == 1 || i == data.size() - 1) {
-      sendPacket((const uint8_t*)&request, sizeof(request));
-      request.pose[0].id = 0;
-      request.pose[1].id = 0;
-    }
-    // std::this_thread::sleep_for(std::chrono::microseconds(5000));
+    request.pose[0].id = data[i].id;
+    request.pose[0].x = single2half(data[i].x);
+    request.pose[0].y = single2half(data[i].y);
+    request.pose[0].z = single2half(data[i].z);
+    request.pose[0].quat[0] = int16_t(data[i].q0 * 32768.0);
+    request.pose[0].quat[1] = int16_t(data[i].q1 * 32768.0);
+    request.pose[0].quat[2] = int16_t(data[i].q2 * 32768.0);
+    request.pose[0].quat[3] = int16_t(data[i].q3 * 32768.0);
+    sendPacket((const uint8_t*)&request, sizeof(request));
   }
+  // request.pose[0].id = 0;
+  // request.pose[1].id = 0;
+  // for (size_t i = 0; i < data.size(); ++i) {
+  //   request.pose[i%2].id = data[i].id;
+  //   request.pose[i%2].x = single2half(data[i].x);
+  //   request.pose[i%2].y = single2half(data[i].y);
+  //   request.pose[i%2].z = single2half(data[i].z);
+  //   request.pose[i%2].quat[0] = int16_t(data[i].q0 * 32768.0);
+  //   request.pose[i%2].quat[1] = int16_t(data[i].q1 * 32768.0);
+  //   request.pose[i%2].quat[2] = int16_t(data[i].q2 * 32768.0);
+  //   request.pose[i%2].quat[3] = int16_t(data[i].q3 * 32768.0);
+  //   if (i%2 == 1 || i == data.size() - 1) {
+  //     sendPacket((const uint8_t*)&request, sizeof(request));
+  //     request.pose[0].id = 0;
+  //     request.pose[1].id = 0;
+  //   }
+  // }
 }

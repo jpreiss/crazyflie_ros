@@ -414,7 +414,7 @@ struct crtpPosExtBringup
       fp16_t z; // m
       int16_t quat[4]; //Quaternion; TODO: find more compact way to store this
                         // each component between -1 and 1
-    } pose[2];
+    } pose[1];
 } __attribute__((packed));
 
 // Port 12 (PosExt)
