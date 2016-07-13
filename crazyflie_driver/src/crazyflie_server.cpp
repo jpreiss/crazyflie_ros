@@ -377,7 +377,8 @@ public:
   CrazyflieServer(
     const std::string& link_uri,
     size_t numCFs,
-    const std::string& worldFrame)
+    const std::string& worldFrame,
+    const std::string& posesTopic)
     : m_numCFs(numCFs)
     , m_worldFrame(worldFrame)
     , m_isEmergency(false)
@@ -395,7 +396,7 @@ public:
     m_serviceTakeoff = n.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
     m_serviceLand = n.advertiseService("land", &CrazyflieServer::land, this);
 
-    m_subscribePoses = n.subscribe("/vicon/poses", 1, &CrazyflieServer::posesChanged, this);
+    m_subscribePoses = n.subscribe(posesTopic, 1, &CrazyflieServer::posesChanged, this);
   }
 
   ~CrazyflieServer()
@@ -408,19 +409,62 @@ public:
   void posesChanged(
     const vicon_ros::NamedPoseArray::ConstPtr& msg)
   {
-    if (msg->poses.size() == 1) {
-      stateExternalBringup stateExternalBringup;
-      stateExternalBringup.id = m_cfs[0]->id();
-      stateExternalBringup.x = msg->poses[0].pose.position.x;
-      stateExternalBringup.y = msg->poses[0].pose.position.y;
-      stateExternalBringup.z = msg->poses[0].pose.position.z;
-      stateExternalBringup.q0 = msg->poses[0].pose.orientation.x;
-      stateExternalBringup.q1 = msg->poses[0].pose.orientation.y;
-      stateExternalBringup.q2 = msg->poses[0].pose.orientation.z;
-      stateExternalBringup.q3 = msg->poses[0].pose.orientation.w;
+    // use direct communication if we have only one CF
+    // This allows us to stream back data
+    // Otherwise, use broadcasts
+    if (m_numCFs == 1) {
+      if (msg->poses.size() > 0) {
+        bool success = false;
+        for (auto& pose: msg->poses) {
+          if (pose.name == m_cfs[0]->frame()) {
+            stateExternalBringup stateExternalBringup;
+            stateExternalBringup.id = m_cfs[0]->id();
+            stateExternalBringup.x = pose.pose.position.x;
+            stateExternalBringup.y = pose.pose.position.y;
+            stateExternalBringup.z = pose.pose.position.z;
+            stateExternalBringup.q0 = pose.pose.orientation.x;
+            stateExternalBringup.q1 = pose.pose.orientation.y;
+            stateExternalBringup.q2 = pose.pose.orientation.z;
+            stateExternalBringup.q3 = pose.pose.orientation.w;
 
-      m_cfs[0]->sendPositionExternalBringup(
-        stateExternalBringup);
+            m_cfs[0]->sendPositionExternalBringup(
+              stateExternalBringup);
+            success = true;
+            break;
+          }
+        }
+        if (!success) {
+          ROS_WARN("Could not find pose for CF %s", m_cfs[0]->frame().c_str());
+        }
+      } else {
+        ROS_WARN("Not enough poses");
+      }
+    } else {
+      std::vector<stateExternalBringup> states;
+      size_t i = 0;
+      for (auto cf : m_cfs) {
+        bool success = false;
+        for (auto& pose: msg->poses) {
+          if (pose.name == cf->frame()) {
+            states.resize(i + 1);
+            states[i].id = cf->id();
+            states[i].x = pose.pose.position.x;
+            states[i].y = pose.pose.position.y;
+            states[i].z = pose.pose.position.z;
+            states[i].q0 = pose.pose.orientation.x;
+            states[i].q1 = pose.pose.orientation.y;
+            states[i].q2 = pose.pose.orientation.z;
+            states[i].q3 = pose.pose.orientation.w;
+            ++i;
+            success = true;
+            break;
+          }
+        }
+        if (!success) {
+          ROS_WARN("Could not find pose for CF %s", cf->frame().c_str());
+        }
+      }
+      m_cfbc.sendPositionExternalBringup(states);
     }
   }
 
@@ -433,7 +477,9 @@ public:
   void run()
   {
     while(ros::ok() && !m_isEmergency) {
-      m_cfs[0]->sendPing();
+      if (m_numCFs == 1) {
+        m_cfs[0]->sendPing();
+      }
       ros::spinOnce();
     }
   }
@@ -614,8 +660,10 @@ int main(int argc, char **argv)
   n.getParam("num_cfs", numCFs);
   std::string broadcastUri;
   n.getParam("broadcast_uri", broadcastUri);
+  std::string posesTopic;
+  n.getParam("poses_topic", posesTopic);
 
-  CrazyflieServer server(broadcastUri, numCFs, worldFrame);
+  CrazyflieServer server(broadcastUri, numCFs, worldFrame, posesTopic);
   for (size_t i = 1; i <= numCFs; ++i) {
     std::stringstream sstr;
     sstr << "crazyflie" << i;
