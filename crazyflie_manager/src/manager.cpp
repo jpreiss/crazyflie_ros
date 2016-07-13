@@ -115,10 +115,12 @@ private:
             double x_offset;
             double y_offset;
             double z_offset;
+            double timescale; // 2 means it will take 2x longer
             n.getParam(sstr.str() + "/csv_file", csvFile);
             n.getParam(sstr.str() + "/x_offset", x_offset);
             n.getParam(sstr.str() + "/y_offset", y_offset);
             n.getParam(sstr.str() + "/z_offset", z_offset);
+            n.getParam(sstr.str() + "/timescale", timescale);
 
             crazyflie_driver::UploadTrajectory srv;
 
@@ -148,10 +150,22 @@ private:
                     for (size_t i = 0; i < 8; ++i) {
                         sstr >> poly.poly_yaw[i] >> dummy;
                     }
-                    poly.duration = ros::Duration(duration);
                     poly.poly_x[0] += x_offset;
                     poly.poly_y[0] += y_offset;
                     poly.poly_z[0] += z_offset;
+
+                    // // e.g. if s==2 the new polynomial will be stretched to take 2x longer
+                    float recip = 1.0f / timescale;
+                    float scale = recip;
+                    for (int i = 1; i < 8; ++i) {
+                        poly.poly_x[i] *= scale;
+                        poly.poly_y[i] *= scale;
+                        poly.poly_z[i] *= scale;
+                        poly.poly_yaw[i] *= scale;
+                        scale *= recip;
+                    }
+                    poly.duration = ros::Duration(duration * timescale);
+
                   // point.position.x += x_offset;
                     // point.position.y += y_offset;
                     srv.request.polygons.push_back(poly);
