@@ -21,7 +21,7 @@
         id: 2
         genericLogTopics: ["log1"]
         genericLogTopicFrequencies: [10]
-        genericLogTopic_log1_Variables: ["stabilizer.yaw", "ctrltarget.yaw"]
+        genericLogTopic_log1_Variables: ["stabilizer.x", "ctrltarget.x", "stabilizer.y", "ctrltarget.y"]
       crazyflie3:
         uri: "radio://0/100/2M/E7E7E7E703"
         frame: "cf3"
@@ -68,7 +68,7 @@
 
   <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_x" args="/crazyflie1/log1/values[0] /crazyflie1/log1/values[1]"/>
 
- <!--  <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_y" args="/crazyflie1/log1/values[2] /crazyflie1/log1/values[3]"/> -->
+  <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_y" args="/crazyflie1/log1/values[2] /crazyflie1/log1/values[3]"/>
 
   <node name="vicon" pkg="vicon_ros" type="vicon_node" output="screen">
     <param name="hostName" value="vicon" />

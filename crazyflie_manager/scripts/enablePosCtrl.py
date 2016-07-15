@@ -9,12 +9,12 @@ if __name__ == '__main__':
     rospy.loginfo("found update_params service")
     update_params = rospy.ServiceProxy('update_params', UpdateParams)
     rospy.set_param("flightmode/posCtrl", 1)
-    rospy.set_param("ctrlMel/kp_xy", 0.2)
-    rospy.set_param("ctrlMel/kd_xy", 0.1)
+    rospy.set_param("ctrlMel/kp_xy", 0.6) # p for position
+    rospy.set_param("ctrlMel/kd_xy", 0.5) # d for position
     rospy.set_param("ctrlMel/ki_xy", 0.05)
     rospy.set_param("ctrlMel/i_range_xy", 2.0)
-    rospy.set_param("ctrlMel/kR_xy", 9000)
-    rospy.set_param("ctrlMel/kw_xy", 3000)
+    rospy.set_param("ctrlMel/kR_xy", 25000) # p for attitude
+    rospy.set_param("ctrlMel/kw_xy", 12000) # d for attitude
 
     rospy.set_param("ctrlMel/kR_z", 25000) # p for yaw
     rospy.set_param("ctrlMel/kw_z", 12000)  # d for yaw
