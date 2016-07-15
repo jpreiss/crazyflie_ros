@@ -8,17 +8,24 @@
       world_frame: "/world"
       poses_topic: "/vicon/poses"
       num_cfs: 1
-      crazyflie2:
-        uri: "radio://0/100/2M/E7E7E7E703"
-        frame: "cf_warehouse1/cf_warehouse1"
-        id: 3
+      crazyflie1_:
+        uri: "radio://0/100/2M/E7E7E7E701"
+        frame: "cf1/cf1"
+        id: 1
         genericLogTopics: ["log1"]
         genericLogTopicFrequencies: [10]
-        genericLogTopic_log1_Variables: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw"]
+        genericLogTopic_log1_Variables: ["stabilizer.z", "ctrltarget.z"]
       crazyflie1:
-        uri: "radio://0/100/2M/E7E7E7E7E7"
-        frame: "cf_warehouse2/cf_warehouse2"
-        id: 231
+        uri: "radio://0/100/2M/E7E7E7E702"
+        frame: "cf2/cf2"
+        id: 2
+        genericLogTopics: ["log1"]
+        genericLogTopicFrequencies: [10]
+        genericLogTopic_log1_Variables: ["stabilizer.yaw", "ctrltarget.yaw"]
+      crazyflie3:
+        uri: "radio://0/100/2M/E7E7E7E703"
+        frame: "cf3"
+        id: 3
         genericLogTopics: ["log1"]
         genericLogTopicFrequencies: [10]
         genericLogTopic_log1_Variables: ["stabilizer.roll", "ctrltarget.roll", "stabilizer.pitch", "ctrltarget.pitch"]
@@ -29,9 +36,14 @@
     <node name="setParams" pkg="crazyflie_manager" type="enablePosCtrl.py" output="screen" />
   </group>
 
-  <group ns="crazyflie2">
+<!--   <group ns="crazyflie2">
     <node name="setParams" pkg="crazyflie_manager" type="enablePosCtrl.py" output="screen" />
   </group>
+
+  <group ns="crazyflie3">
+    <node name="setParams" pkg="crazyflie_manager" type="enablePosCtrl.py" output="screen" />
+  </group>
+  -->
 
   <node name="joy" pkg="joy" type="joy_node" output="screen">
     <param name="dev" value="$(arg joy_dev)" />
@@ -56,7 +68,7 @@
 
   <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_x" args="/crazyflie1/log1/values[0] /crazyflie1/log1/values[1]"/>
 
-  <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_y" args="/crazyflie1/log1/values[2] /crazyflie1/log1/values[3]"/>
+ <!--  <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_y" args="/crazyflie1/log1/values[2] /crazyflie1/log1/values[3]"/> -->
 
   <node name="vicon" pkg="vicon_ros" type="vicon_node" output="screen">
     <param name="hostName" value="vicon" />

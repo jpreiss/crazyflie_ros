@@ -764,13 +764,13 @@ void CrazyflieBroadcaster::trajectoryStart()
 
 void CrazyflieBroadcaster::takeoff()
 {
-  crtpTrajectoryTakeoffRequest request(1.2, 2000);
+  crtpTrajectoryTakeoffRequest request(1.0, 2000);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
 void CrazyflieBroadcaster::land()
 {
-  crtpTrajectoryLandRequest request(0.0, 2000);
+  crtpTrajectoryLandRequest request(0.06, 2000);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
