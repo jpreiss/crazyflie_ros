@@ -377,11 +377,9 @@ class CrazyflieServer
 public:
   CrazyflieServer(
     const std::string& link_uri,
-    size_t numCFs,
     const std::string& worldFrame,
     const std::string& posesTopic)
-    : m_numCFs(numCFs)
-    , m_worldFrame(worldFrame)
+    : m_worldFrame(worldFrame)
     , m_isEmergency(false)
     , m_cfbc(link_uri)
     , m_serviceEmergency()
@@ -417,7 +415,7 @@ public:
     // use direct communication if we have only one CF
     // This allows us to stream back data
     // Otherwise, use broadcasts
-    if (m_numCFs == 1) {
+    if (m_cfs.size() == 1) {
       if (msg->poses.size() > 0) {
         bool success = false;
         for (auto& pose: msg->poses) {
@@ -499,7 +497,7 @@ public:
   void runSlow()
   {
     while(ros::ok() && !m_isEmergency) {
-      if (m_numCFs == 1) {
+      if (m_cfs.size() == 1) {
         m_cfs[0]->sendPing();
       }
       m_slowQueue.callAvailable(ros::WallDuration(0.01));
@@ -656,7 +654,6 @@ private:
   }
 
 private:
-  size_t m_numCFs;
   std::string m_worldFrame;
   bool m_isEmergency;
   CrazyflieBroadcaster m_cfbc;
@@ -691,51 +688,69 @@ int main(int argc, char **argv)
   ros::NodeHandle n("~");
   std::string worldFrame;
   n.param<std::string>("world_frame", worldFrame, "/world");
-  int numCFs;
-  n.getParam("num_cfs", numCFs);
   std::string broadcastUri;
   n.getParam("broadcast_uri", broadcastUri);
   std::string posesTopic;
   n.getParam("poses_topic", posesTopic);
 
-  CrazyflieServer server(broadcastUri, numCFs, worldFrame, posesTopic);
-  for (size_t i = 1; i <= numCFs; ++i) {
-    std::stringstream sstr;
-    sstr << "crazyflie" << i;
-    std::string uri;
-    n.getParam(sstr.str() + "/uri", uri);
-    std::string frame;
-    n.getParam(sstr.str() + "/frame", frame);
-    int id;
-    n.getParam(sstr.str() + "/id", id);
-    // custom log blocks
-    std::vector<std::string> genericLogTopics;
-    n.param(sstr.str() + "/genericLogTopics", genericLogTopics, std::vector<std::string>());
-    std::vector<int> genericLogTopicFrequencies;
-    n.param(sstr.str() + "/genericLogTopicFrequencies", genericLogTopicFrequencies, std::vector<int>());
+  CrazyflieServer server(broadcastUri, worldFrame, posesTopic);
 
-    std::vector<crazyflie_driver::LogBlock> logBlocks;
+  // custom log blocks
+  std::vector<std::string> genericLogTopics;
+  n.param("genericLogTopics", genericLogTopics, std::vector<std::string>());
+  std::vector<int> genericLogTopicFrequencies;
+  n.param("genericLogTopicFrequencies", genericLogTopicFrequencies, std::vector<int>());
 
-    if (genericLogTopics.size() == genericLogTopicFrequencies.size())
+  std::vector<crazyflie_driver::LogBlock> logBlocks;
+
+  if (genericLogTopics.size() == genericLogTopicFrequencies.size())
+  {
+    size_t i = 0;
+    for (auto& topic : genericLogTopics)
     {
-      size_t i = 0;
-      for (auto& topic : genericLogTopics)
-      {
-        crazyflie_driver::LogBlock logBlock;
-        logBlock.topic_name = topic;
-        logBlock.frequency = genericLogTopicFrequencies[i];
-        n.getParam(sstr.str() + "/genericLogTopic_" + topic + "_Variables", logBlock.variables);
-        logBlocks.push_back(logBlock);
-        ++i;
-      }
+      crazyflie_driver::LogBlock logBlock;
+      logBlock.topic_name = topic;
+      logBlock.frequency = genericLogTopicFrequencies[i];
+      n.getParam("genericLogTopic_" + topic + "_Variables", logBlock.variables);
+      logBlocks.push_back(logBlock);
+      ++i;
     }
-    else
-    {
-      ROS_ERROR("Cardinality of genericLogTopics and genericLogTopicFrequencies does not match!");
-    }
-
-    server.addCrazyflie(uri, sstr.str(), frame, id, logBlocks);
   }
+  else
+  {
+    ROS_ERROR("Cardinality of genericLogTopics and genericLogTopicFrequencies does not match!");
+  }
+
+  // read CF config
+  ros::NodeHandle nGlobal;
+
+  XmlRpc::XmlRpcValue crazyflies;
+  nGlobal.getParam("crazyflies", crazyflies);
+  ROS_ASSERT(crazyflies.getType() == XmlRpc::XmlRpcValue::TypeArray);
+
+  for (int32_t i = 0; i < crazyflies.size(); ++i)
+  {
+    ROS_ASSERT(crazyflies[i].getType() == XmlRpc::XmlRpcValue::TypeStruct);
+    XmlRpc::XmlRpcValue crazyflie = crazyflies[i];
+    std::string id = crazyflie["id"];
+    // XmlRpc::XmlRpcValue pos = crazyflie["initialPosition"];
+    // ROS_ASSERT(pos.getType() == XmlRpc::XmlRpcValue::TypeArray);
+    // for (int32_t j = 0; j < pos.size(); ++j)
+    // {
+    //   ROS_ASSERT(pos[j].getType() == XmlRpc::XmlRpcValue::TypeDouble);
+    //   double f = static_cast<double>(pos[j]);
+    //   std::cout << pos[j].getType() << std::endl;
+
+    // }
+
+    std::string uri = "radio://0/100/2M/E7E7E7E7" + id;
+    std::string tf_prefix = "cf" + id;
+    std::string frame = "cf" + id + "/cf" + id;
+    int idNumber;
+    std::sscanf(id.c_str(), "%x", &idNumber);
+    server.addCrazyflie(uri, tf_prefix, frame, idNumber, logBlocks);
+  }
+
   ROS_INFO("All CFs are ready!");
 
   // server.start();
