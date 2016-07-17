@@ -43,7 +43,8 @@ public:
     const std::string& worldFrame,
     bool enable_parameters,
     int id,
-    const std::vector<crazyflie_driver::LogBlock>& log_blocks)
+    const std::vector<crazyflie_driver::LogBlock>& log_blocks,
+    ros::CallbackQueue& queue)
     : m_cf(link_uri)
     , m_tf_prefix(tf_prefix)
     , m_frame(frame)
@@ -56,6 +57,7 @@ public:
     , m_logBlocks(log_blocks)
   {
     ros::NodeHandle n;
+    n.setCallbackQueue(&queue);
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
 
     for (auto& logBlock : m_logBlocks)
@@ -168,8 +170,10 @@ public:
     return true;
   }
 
-  void uploadTrajectoryThreaded(
-    const crazyflie_driver::UploadTrajectory::Request& req)
+
+  bool uploadTrajectory(
+    crazyflie_driver::UploadTrajectory::Request& req,
+    crazyflie_driver::UploadTrajectory::Response& res)
   {
     ROS_INFO("[%s] Upload trajectory", m_frame.c_str());
 
@@ -186,16 +190,6 @@ public:
 
     ROS_INFO("[%s] Uploaded trajectory", m_frame.c_str());
 
-
-  }
-
-  bool uploadTrajectory(
-    crazyflie_driver::UploadTrajectory::Request& req,
-    crazyflie_driver::UploadTrajectory::Response& res)
-  {
-    std::thread t([=] { uploadTrajectoryThreaded(req); });
-
-    t.join();
 
     return true;
   }
@@ -245,7 +239,8 @@ public:
   //   return true;
   // }
 
-  void run()
+  void run(
+    ros::CallbackQueue& queue)
   {
     // m_cf.reboot();
 
@@ -290,6 +285,7 @@ public:
         }
       }
       ros::NodeHandle n;
+      n.setCallbackQueue(&queue);
       m_serviceUpdateParams = n.advertiseService(m_tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     }
 
@@ -389,14 +385,18 @@ public:
     , m_serviceLand()
     , m_listener()
   {
-    ros::NodeHandle n;
-    m_serviceEmergency = n.advertiseService("emergency", &CrazyflieServer::emergency, this);
+    ros::NodeHandle nhFast;
+    nhFast.setCallbackQueue(&m_fastQueue);
 
-    m_serviceStartTrajectory = n.advertiseService("start_trajectory", &CrazyflieServer::startTrajectory, this);
-    m_serviceTakeoff = n.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
-    m_serviceLand = n.advertiseService("land", &CrazyflieServer::land, this);
+    m_subscribePoses = nhFast.subscribe(posesTopic, 1, &CrazyflieServer::posesChanged, this);
+    m_serviceEmergency = nhFast.advertiseService("emergency", &CrazyflieServer::emergency, this);
 
-    m_subscribePoses = n.subscribe(posesTopic, 1, &CrazyflieServer::posesChanged, this);
+    ros::NodeHandle nhSlow;
+    nhSlow.setCallbackQueue(&m_slowQueue);
+
+    m_serviceStartTrajectory = nhSlow.advertiseService("start_trajectory", &CrazyflieServer::startTrajectory, this);
+    m_serviceTakeoff = nhSlow.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
+    m_serviceLand = nhSlow.advertiseService("land", &CrazyflieServer::land, this);
   }
 
   ~CrazyflieServer()
@@ -476,11 +476,27 @@ public:
 
   void run()
   {
+    std::thread tFast(&CrazyflieServer::runFast, this);
+    std::thread tSlow(&CrazyflieServer::runSlow, this);
+
+    tFast.join();
+    tSlow.join();
+  }
+
+  void runFast()
+  {
+    while(ros::ok() && !m_isEmergency) {
+      m_fastQueue.callAvailable(ros::WallDuration(0.1));
+    }
+  }
+
+  void runSlow()
+  {
     while(ros::ok() && !m_isEmergency) {
       if (m_numCFs == 1) {
         m_cfs[0]->sendPing();
       }
-      ros::spinOnce();
+      m_slowQueue.callAvailable(ros::WallDuration(0.01));
     }
   }
 
@@ -574,9 +590,10 @@ public:
       m_worldFrame,
       true,
       id,
-      logBlocks
+      logBlocks,
+      m_slowQueue
       );
-    cf->run();
+    cf->run(m_slowQueue);
     m_cfs.push_back(cf);
   }
 
@@ -647,6 +664,16 @@ private:
 
 
   tf::TransformListener m_listener;
+
+
+  // We have two callback queues
+  // 1. Fast queue handles pose and emergency callbacks. Those are high-priority and can be served quickly
+  // 2. Slow queue handles all other requests.
+  // Each queue is handled in its own thread. We don't want a thread per CF to make sure that the fast queue
+  //  gets called frequently enough.
+
+  ros::CallbackQueue m_fastQueue;
+  ros::CallbackQueue m_slowQueue;
 };
 
 int main(int argc, char **argv)
