@@ -609,6 +609,7 @@ void Crazyflie::handleRequests(
   float timeout = baseTime + timePerRequest * m_batchRequests.size();
 
   while (true) {
+    // std::this_thread::sleep_for(std::chrono::milliseconds(25));
     if (!sendPing) {
       for (const auto& request : m_batchRequests) {
         if (!request.finished) {

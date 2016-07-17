@@ -206,7 +206,7 @@ private:
   }
 
   void handleRequests(
-    float baseTime = 0.5,
+    float baseTime = 2.0,
     float timePerRequest = 0.05);
 
   void handleBatchAck(

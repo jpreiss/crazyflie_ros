@@ -23,6 +23,11 @@
 
 #include <crazyflie_cpp/Crazyflie.h>
 
+// debug test
+#include <signal.h>
+#include <csignal> // or C++ style alternative
+//
+
 constexpr double pi() { return std::atan(1)*4; }
 
 double degToRad(double deg) {
@@ -476,10 +481,11 @@ public:
 
   void run()
   {
-    std::thread tFast(&CrazyflieServer::runFast, this);
+//    std::thread tFast(&CrazyflieServer::runFast, this);
     std::thread tSlow(&CrazyflieServer::runSlow, this);
 
-    tFast.join();
+//    tFast.join();
+    runFast();
     tSlow.join();
   }
 
@@ -678,6 +684,8 @@ private:
 
 int main(int argc, char **argv)
 {
+  // raise(SIGSTOP);
+
   ros::init(argc, argv, "crazyflie_server");
 
   ros::NodeHandle n("~");
