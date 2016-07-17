@@ -37,10 +37,18 @@ public:
         ros::NodeHandle nh;
         m_subscribeJoy = nh.subscribe("/joy", 1, &Manager::joyChanged, this);
 
+        ROS_INFO("Wait for services...");
+
+        ros::service::waitForService("/emergency");
         m_serviceEmergency = nh.serviceClient<std_srvs::Empty>("/emergency");
+        ros::service::waitForService("/takeoff");
         m_serviceTakeoff = nh.serviceClient<std_srvs::Empty>("/takeoff");
+        ros::service::waitForService("/land");
         m_serviceLand = nh.serviceClient<std_srvs::Empty>("/land");
+        ros::service::waitForService("/start_trajectory");
         m_serviceStartTrajectory = nh.serviceClient<std_srvs::Empty>("/start_trajectory");
+
+        ROS_INFO("Manager ready.");
     }
 
     ~Manager()
@@ -78,8 +86,10 @@ private:
 
     void emergency()
     {
+        ROS_INFO("emergency requested...");
         std_srvs::Empty srv;
         m_serviceEmergency.call(srv);
+        ROS_INFO("Done.");
     }
 
     void takeoff()
