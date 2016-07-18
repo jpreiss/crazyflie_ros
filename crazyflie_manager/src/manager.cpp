@@ -112,85 +112,80 @@ private:
 
     void uploadTrajectory()
     {
+        // read trajectory
         ros::NodeHandle n("~");
-        int numCFs;
-        n.getParam("num_cfs", numCFs);
+        std::string csvFile;
+        double timescale; // 2 means it will take 2x longer
+        n.getParam("csv_file", csvFile);
+        n.getParam("timescale", timescale);
 
-        for (size_t i = 1; i <= numCFs; ++i)
-        {
-            std::stringstream sstr;
-            sstr << "crazyflie" << i;
-
-            std::string csvFile;
-            double x_offset;
-            double y_offset;
-            double z_offset;
-            double timescale; // 2 means it will take 2x longer
-            n.getParam(sstr.str() + "/csv_file", csvFile);
-            n.getParam(sstr.str() + "/x_offset", x_offset);
-            n.getParam(sstr.str() + "/y_offset", y_offset);
-            n.getParam(sstr.str() + "/z_offset", z_offset);
-            n.getParam(sstr.str() + "/timescale", timescale);
-
-            crazyflie_driver::UploadTrajectory srv;
-
-            std::ifstream stream(csvFile);
-            bool firstLine = true;
-            for (std::string line; std::getline(stream, line); ) {
-                if (!firstLine) {
-                    std::stringstream sstr;
-                    char dummy;
-                    float duration, accX, accY, accZ;
-                    crazyflie_driver::QuadcopterTrajectoryPoly poly;
-                    sstr << line;
-                    sstr >> duration >> dummy;
-                    poly.poly_x.resize(8);
-                    for (size_t i = 0; i < 8; ++i) {
-                        sstr >> poly.poly_x[i] >> dummy;
-                    }
-                    poly.poly_y.resize(8);
-                    for (size_t i = 0; i < 8; ++i) {
-                        sstr >> poly.poly_y[i] >> dummy;
-                    }
-                    poly.poly_z.resize(8);
-                    for (size_t i = 0; i < 8; ++i) {
-                        sstr >> poly.poly_z[i] >> dummy;
-                    }
-                    poly.poly_yaw.resize(8);
-                    for (size_t i = 0; i < 8; ++i) {
-                        sstr >> poly.poly_yaw[i] >> dummy;
-                    }
-                    poly.poly_x[0] += x_offset;
-                    poly.poly_y[0] += y_offset;
-                    poly.poly_z[0] += z_offset;
-
-                    // // e.g. if s==2 the new polynomial will be stretched to take 2x longer
-                    float recip = 1.0f / timescale;
-                    float scale = recip;
-                    for (int i = 1; i < 8; ++i) {
-                        poly.poly_x[i] *= scale;
-                        poly.poly_y[i] *= scale;
-                        poly.poly_z[i] *= scale;
-                        poly.poly_yaw[i] *= scale;
-                        scale *= recip;
-                    }
-                    poly.duration = ros::Duration(duration * timescale);
-
-                  // point.position.x += x_offset;
-                    // point.position.y += y_offset;
-                    srv.request.polygons.push_back(poly);
+        crazyflie_driver::UploadTrajectory srv;
+        std::ifstream stream(csvFile);
+        bool firstLine = true;
+        for (std::string line; std::getline(stream, line); ) {
+            if (!firstLine) {
+                std::stringstream sstr;
+                char dummy;
+                float duration, accX, accY, accZ;
+                crazyflie_driver::QuadcopterTrajectoryPoly poly;
+                sstr << line;
+                sstr >> duration >> dummy;
+                poly.poly_x.resize(8);
+                for (size_t i = 0; i < 8; ++i) {
+                    sstr >> poly.poly_x[i] >> dummy;
                 }
-                firstLine = false;
+                poly.poly_y.resize(8);
+                for (size_t i = 0; i < 8; ++i) {
+                    sstr >> poly.poly_y[i] >> dummy;
+                }
+                poly.poly_z.resize(8);
+                for (size_t i = 0; i < 8; ++i) {
+                    sstr >> poly.poly_z[i] >> dummy;
+                }
+                poly.poly_yaw.resize(8);
+                for (size_t i = 0; i < 8; ++i) {
+                    sstr >> poly.poly_yaw[i] >> dummy;
+                }
+                // poly.poly_x[0] += x_offset;
+                // poly.poly_y[0] += y_offset;
+                // poly.poly_z[0] += z_offset;
+
+                // // e.g. if s==2 the new polynomial will be stretched to take 2x longer
+                float recip = 1.0f / timescale;
+                float scale = recip;
+                for (int i = 1; i < 8; ++i) {
+                    poly.poly_x[i] *= scale;
+                    poly.poly_y[i] *= scale;
+                    poly.poly_z[i] *= scale;
+                    poly.poly_yaw[i] *= scale;
+                    scale *= recip;
+                }
+                poly.duration = ros::Duration(duration * timescale);
+
+              // point.position.x += x_offset;
+                // point.position.y += y_offset;
+                srv.request.polygons.push_back(poly);
             }
-
-            // for (auto& poly : srv.request.polygons) {
-            //     // point.time_from_start.toSec();
-            //     ROS_INFO("%f,%f,%f,%f,%f,%f,%f,%f", poly.duration.toSec(), );
-            // }
-
-            ros::service::call(sstr.str() + "/upload_trajectory", srv);
+            firstLine = false;
         }
 
+        // upload for each CF
+        ros::NodeHandle nGlobal;
+
+        XmlRpc::XmlRpcValue crazyflies;
+        nGlobal.getParam("crazyflies", crazyflies);
+        ROS_ASSERT(crazyflies.getType() == XmlRpc::XmlRpcValue::TypeArray);
+
+        for (int32_t i = 0; i < crazyflies.size(); ++i)
+        {
+            ROS_ASSERT(crazyflies[i].getType() == XmlRpc::XmlRpcValue::TypeStruct);
+            XmlRpc::XmlRpcValue crazyflie = crazyflies[i];
+            std::string id = crazyflie["id"];
+
+            ros::service::call("cf" + id + "/upload_trajectory", srv);
+        }
+
+        ROS_INFO("All trajectories uploaded.");
     }
 
     // void callEmptyService(const std::string&)
