@@ -663,9 +663,11 @@ private:
   ros::ServiceServer m_serviceLand;
   ros::Subscriber m_subscribePoses;
 
+public:
+  // TODO: make me private again!
   std::vector<CrazyflieROS*> m_cfs;
 
-
+private:
   tf::TransformListener m_listener;
 
 
@@ -749,6 +751,40 @@ int main(int argc, char **argv)
     int idNumber;
     std::sscanf(id.c_str(), "%x", &idNumber);
     server.addCrazyflie(uri, tf_prefix, frame, idNumber, logBlocks);
+
+    // update parameters
+    XmlRpc::XmlRpcValue firmwareParams;
+    n.getParam("firmwareParams", firmwareParams);
+
+    crazyflie_driver::UpdateParams::Request request;
+    crazyflie_driver::UpdateParams::Response response;
+
+    // ROS_ASSERT(firmwareParams.getType() == XmlRpc::XmlRpcValue::TypeArray);
+    auto iter = firmwareParams.begin();
+    for (; iter != firmwareParams.end(); ++iter) {
+      std::string group = iter->first;
+      XmlRpc::XmlRpcValue v = iter->second;
+      auto iter2 = v.begin();
+      for (; iter2 != v.end(); ++iter2) {
+        std::string param = iter2->first;
+        XmlRpc::XmlRpcValue value = iter2->second;
+        if (value.getType() == XmlRpc::XmlRpcValue::TypeBoolean) {
+          bool b = value;
+          nGlobal.setParam(tf_prefix + "/" + group + "/" + param, b);
+        } else if (value.getType() == XmlRpc::XmlRpcValue::TypeInt) {
+          int b = value;
+          nGlobal.setParam(tf_prefix + "/" + group + "/" + param, b);
+        } else if (value.getType() == XmlRpc::XmlRpcValue::TypeDouble) {
+          double b = value;
+          nGlobal.setParam(tf_prefix + "/" + group + "/" + param, b);
+        } else {
+          ROS_WARN("No known type for %s.%s!", group.c_str(), param.c_str());
+        }
+        request.params.push_back(group + "/" + param);
+      }
+    }
+
+    server.m_cfs.back()->updateParams(request, response);
   }
 
   ROS_INFO("All CFs are ready!");
