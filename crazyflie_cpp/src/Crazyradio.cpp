@@ -5,6 +5,8 @@
 
 #include <libusb-1.0/libusb.h>
 
+// #include <iostream>
+
 enum
 {
     SET_RADIO_CHANNEL   = 0x01,
@@ -27,6 +29,7 @@ Crazyradio::Crazyradio(
     , m_address(0)
     , m_datarate(Datarate_250KPS)
     , m_ackEnable(true)
+    , m_numPacketsSent(0)
 {
     open(devid);
     setDatarate(Datarate_2MPS);
@@ -177,6 +180,11 @@ void Crazyradio::sendPacket(
     }
 
     result.size = transferred - 1;
+
+    ++m_numPacketsSent;
+    // if (m_numPacketsSent % 100 == 0) {
+    //     std::cout << "#packets: " << m_numPacketsSent << std::endl;
+    // }
 }
 
 void Crazyradio::sendPacketNoAck(
@@ -206,4 +214,9 @@ void Crazyradio::sendPacketNoAck(
         sstr << "Did transfer " << transferred << " but " << length << " was requested!";
         throw std::runtime_error(sstr.str());
     }
+
+    ++m_numPacketsSent;
+    // if (m_numPacketsSent % 100 == 0) {
+    //     std::cout << "#packets: " << m_numPacketsSent << std::endl;
+    // }
 }

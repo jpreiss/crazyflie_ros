@@ -94,4 +94,5 @@ private:
     uint64_t m_address;
     Datarate m_datarate;
     bool m_ackEnable;
+    uint32_t m_numPacketsSent;
 };
