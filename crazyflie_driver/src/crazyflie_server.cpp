@@ -622,6 +622,7 @@ private:
 
     for (size_t i = 0; i < 10; ++i) {
       m_cfbc.takeoff();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     return true;
@@ -635,6 +636,7 @@ private:
 
     for (size_t i = 0; i < 10; ++i) {
       m_cfbc.land();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     return true;
@@ -648,6 +650,7 @@ private:
 
     for (size_t i = 0; i < 10; ++i) {
       m_cfbc.trajectoryStart();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     return true;
