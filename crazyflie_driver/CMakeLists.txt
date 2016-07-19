@@ -10,16 +10,23 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   crazyflie_cpp
   vicon_ros
+  libobjecttracker
+  tf_conversions
 )
 
 # Enable C++11
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 #SET(CMAKE_CXX_COMPILER             "gcc-4.9")
 
+set(VICON_SDK_DIR ../externalDependencies/vicon_sdk/)
+
 # SET(CMAKE_BUILD_TYPE "Debug")
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
+find_package(PCL REQUIRED)
+# find_package(libobjecttracker REQUIRED)
+# message(${libobjecttracker_PKGCONFIG_DIR})
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -71,6 +78,7 @@ catkin_package(
     std_msgs
     tf
     crazyflie_cpp
+    # libobjecttracker
 #  DEPENDS system_lib
 )
 
@@ -80,7 +88,17 @@ catkin_package(
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
+  # ${libobjecttracker_INCLUDE_DIRS}
+  ../externalDependencies/libobjecttracker/include
+  ${VICON_SDK_DIR}/include
 )
+
+link_directories(
+  ${VICON_SDK_DIR}/lib64
+)
+
+# message(${CMAKE_BINARY_DIR}/crazyflie_ros/externalDependencies/libobjecttracker)
 
 ## Declare a cpp executable
 add_executable(crazyflie_server
@@ -96,6 +114,9 @@ add_dependencies(crazyflie_server
 ## Specify libraries to link a library or executable target against
 target_link_libraries(crazyflie_server
   ${catkin_LIBRARIES}
+  # ${libobjecttracker_LIBRARIES}
+  # ${libobjecttracker_LIBRARIES}
+  ViconDataStreamSDK_CPP
 )
 
 ## Declare a cpp executable
