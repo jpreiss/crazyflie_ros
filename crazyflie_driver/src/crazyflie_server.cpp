@@ -451,8 +451,12 @@ public:
       markerConfigurations,
       objects);
 
-    std::string hostName = "vicon";
+    std::string hostName;
+    bool useViconTracker;
 
+    ros::NodeHandle nl("~");
+    nl.getParam("host_name", hostName);
+    nl.getParam("use_vicon_tracker", useViconTracker);
 
     using namespace ViconDataStreamSDK::CPP;
 
@@ -471,7 +475,11 @@ public:
     }
 
     // Configure vicon
-    client.EnableUnlabeledMarkerData();
+    if (useViconTracker) {
+      client.EnableSegmentData();
+    } else {
+      client.EnableUnlabeledMarkerData();
+    }
     // client.EnableMarkerData();
     // client.EnableSegmentData();
 
@@ -512,36 +520,72 @@ public:
       // }
 
       // Get the unlabeled markers and create point cloud
-      size_t count = client.GetUnlabeledMarkerCount().MarkerCount;
-      pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
+      std::vector<stateExternalBringup> states;
+      if (useViconTracker) {
+        for (auto cf : m_cfs) {
+          std::string subjectName = cf->frame();
+          std::string segmentName = cf->frame();
 
-      msgPointCloud.header.seq += 1;
-      msgPointCloud.header.stamp = ros::Time::now();
-      msgPointCloud.points.resize(count);
+          Output_GetSegmentGlobalTranslation translation = client.GetSegmentGlobalTranslation(subjectName, segmentName);
+          Output_GetSegmentGlobalRotationQuaternion quaternion = client.GetSegmentGlobalRotationQuaternion(subjectName, segmentName);
 
-      for(size_t i = 0; i < count; ++i) {
-        Output_GetUnlabeledMarkerGlobalTranslation translation =
-          client.GetUnlabeledMarkerGlobalTranslation(i);
-        markers->push_back(pcl::PointXYZ(
-          translation.Translation[0] / 1000.0,
-          translation.Translation[1] / 1000.0,
-          translation.Translation[2] / 1000.0));
+          if (!translation.Occluded) {
 
-        msgPointCloud.points[i].x = translation.Translation[0] / 1000.0;
-        msgPointCloud.points[i].y = translation.Translation[1] / 1000.0;
-        msgPointCloud.points[i].z = translation.Translation[2] / 1000.0;
-      }
-      m_pubPointCloud.publish(msgPointCloud);
+            states.resize(states.size() + 1);
+            states.back().id = cf->id();
+            states.back().x = translation.Translation[0] / 1000.0;
+            states.back().y = translation.Translation[1] / 1000.0;
+            states.back().z = translation.Translation[2] / 1000.0;
+            states.back().q0 = quaternion.Rotation[0];
+            states.back().q1 = quaternion.Rotation[1];
+            states.back().q2 = quaternion.Rotation[2];
+            states.back().q3 = quaternion.Rotation[3];
 
-      // run object tracker
-      {
-        auto start = std::chrono::high_resolution_clock::now();
-        tracker.update(markers);
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsedSeconds = end-start;
-        totalLatency += elapsedSeconds.count();
-        // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
-      }
+            tf::Transform transform;
+            transform.setOrigin(tf::Vector3(
+              translation.Translation[0] / 1000.0,
+              translation.Translation[1] / 1000.0,
+              translation.Translation[2] / 1000.0));
+            tf::Quaternion q(
+              quaternion.Rotation[0],
+              quaternion.Rotation[1],
+              quaternion.Rotation[2],
+              quaternion.Rotation[3]);
+            transform.setRotation(q);
+            m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", cf->frame()));
+          }
+        }
+      } else {
+        size_t count = client.GetUnlabeledMarkerCount().MarkerCount;
+        pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
+
+        msgPointCloud.header.seq += 1;
+        msgPointCloud.header.stamp = ros::Time::now();
+        msgPointCloud.points.resize(count);
+
+        for(size_t i = 0; i < count; ++i) {
+          Output_GetUnlabeledMarkerGlobalTranslation translation =
+            client.GetUnlabeledMarkerGlobalTranslation(i);
+          markers->push_back(pcl::PointXYZ(
+            translation.Translation[0] / 1000.0,
+            translation.Translation[1] / 1000.0,
+            translation.Translation[2] / 1000.0));
+
+          msgPointCloud.points[i].x = translation.Translation[0] / 1000.0;
+          msgPointCloud.points[i].y = translation.Translation[1] / 1000.0;
+          msgPointCloud.points[i].z = translation.Translation[2] / 1000.0;
+        }
+        m_pubPointCloud.publish(msgPointCloud);
+
+        // run object tracker
+        {
+          auto start = std::chrono::high_resolution_clock::now();
+          tracker.update(markers);
+          auto end = std::chrono::high_resolution_clock::now();
+          std::chrono::duration<double> elapsedSeconds = end-start;
+          totalLatency += elapsedSeconds.count();
+          // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
+        }
 
       // send new state estimate to CFs
       // use direct communication if we have only one CF
