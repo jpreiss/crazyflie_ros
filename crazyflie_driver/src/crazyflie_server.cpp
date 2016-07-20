@@ -45,6 +45,11 @@ double radToDeg(double rad) {
     return rad * 180.0 / pi();
 }
 
+void logWarn(const std::string& msg)
+{
+  ROS_WARN("%s", msg.c_str());
+}
+
 class CrazyflieROS
 {
 public:
@@ -450,6 +455,8 @@ public:
       dynamicsConfigurations,
       markerConfigurations,
       objects);
+
+    tracker.setLogWarningCallback(logWarn);
 
     std::string hostName;
     bool useViconTracker;
@@ -897,6 +904,7 @@ private:
       nl.getParam(sstr.str() + "/maxYawRate", dynamicsConfigurations[i].maxYawRate);
       nl.getParam(sstr.str() + "/maxRoll", dynamicsConfigurations[i].maxRoll);
       nl.getParam(sstr.str() + "/maxPitch", dynamicsConfigurations[i].maxPitch);
+      nl.getParam(sstr.str() + "/maxFitnessScore", dynamicsConfigurations[i].maxFitnessScore);
     }
   }
 
