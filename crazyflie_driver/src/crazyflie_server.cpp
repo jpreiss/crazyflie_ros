@@ -381,8 +381,7 @@ class CrazyflieServer
 public:
   CrazyflieServer(
     const std::string& link_uri,
-    const std::string& worldFrame,
-    const std::string& posesTopic)
+    const std::string& worldFrame)
     : m_worldFrame(worldFrame)
     , m_isEmergency(false)
     , m_cfbc(link_uri)
@@ -396,7 +395,6 @@ public:
     ros::NodeHandle nhFast;
     nhFast.setCallbackQueue(&m_fastQueue);
 
-    m_subscribePoses = nhFast.subscribe(posesTopic, 1, &CrazyflieServer::posesChanged, this);
     m_serviceEmergency = nhFast.advertiseService("emergency", &CrazyflieServer::emergency, this);
 
     ros::NodeHandle nhSlow;
@@ -414,68 +412,6 @@ public:
   {
     for(auto cf : m_cfs) {
       delete cf;
-    }
-  }
-
-  void posesChanged(
-    const vicon_ros::NamedPoseArray::ConstPtr& msg)
-  {
-    // use direct communication if we have only one CF
-    // This allows us to stream back data
-    // Otherwise, use broadcasts
-    if (m_cfs.size() == 1) {
-      if (msg->poses.size() > 0) {
-        bool success = false;
-        for (auto& pose: msg->poses) {
-          if (pose.name == m_cfs[0]->frame()) {
-            stateExternalBringup stateExternalBringup;
-            stateExternalBringup.id = m_cfs[0]->id();
-            stateExternalBringup.x = pose.pose.position.x;
-            stateExternalBringup.y = pose.pose.position.y;
-            stateExternalBringup.z = pose.pose.position.z;
-            stateExternalBringup.q0 = pose.pose.orientation.x;
-            stateExternalBringup.q1 = pose.pose.orientation.y;
-            stateExternalBringup.q2 = pose.pose.orientation.z;
-            stateExternalBringup.q3 = pose.pose.orientation.w;
-
-            m_cfs[0]->sendPositionExternalBringup(
-              stateExternalBringup);
-            success = true;
-            break;
-          }
-        }
-        if (!success) {
-          ROS_WARN("Could not find pose for CF %s", m_cfs[0]->frame().c_str());
-        }
-      } else {
-        ROS_WARN("Not enough poses");
-      }
-    } else {
-      std::vector<stateExternalBringup> states;
-      size_t i = 0;
-      for (auto cf : m_cfs) {
-        bool success = false;
-        for (auto& pose: msg->poses) {
-          if (pose.name == cf->frame()) {
-            states.resize(i + 1);
-            states[i].id = cf->id();
-            states[i].x = pose.pose.position.x;
-            states[i].y = pose.pose.position.y;
-            states[i].z = pose.pose.position.z;
-            states[i].q0 = pose.pose.orientation.x;
-            states[i].q1 = pose.pose.orientation.y;
-            states[i].q2 = pose.pose.orientation.z;
-            states[i].q3 = pose.pose.orientation.w;
-            ++i;
-            success = true;
-            break;
-          }
-        }
-        if (!success) {
-          ROS_WARN("Could not find pose for CF %s", cf->frame().c_str());
-        }
-      }
-      m_cfbc.sendPositionExternalBringup(states);
     }
   }
 
@@ -997,7 +933,6 @@ private:
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
   ros::ServiceServer m_serviceEllipse;
-  ros::Subscriber m_subscribePoses;
 
   ros::Publisher m_pubPointCloud;
   tf::TransformBroadcaster m_br;
@@ -1031,10 +966,8 @@ int main(int argc, char **argv)
   n.param<std::string>("world_frame", worldFrame, "/world");
   std::string broadcastUri;
   n.getParam("broadcast_uri", broadcastUri);
-  std::string posesTopic;
-  n.getParam("poses_topic", posesTopic);
 
-  CrazyflieServer server(broadcastUri, worldFrame, posesTopic);
+  CrazyflieServer server(broadcastUri, worldFrame);
 
   // custom log blocks
   std::vector<std::string> genericLogTopics;
