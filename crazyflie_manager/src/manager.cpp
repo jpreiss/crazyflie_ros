@@ -33,6 +33,7 @@ public:
         , m_serviceTakeoff()
         , m_serviceLand()
         , m_serviceStartTrajectory()
+        , m_serviceEllipse()
     {
         ros::NodeHandle nh;
         m_subscribeJoy = nh.subscribe("/joy", 1, &Manager::joyChanged, this);
@@ -47,6 +48,8 @@ public:
         m_serviceLand = nh.serviceClient<std_srvs::Empty>("/land");
         ros::service::waitForService("/start_trajectory");
         m_serviceStartTrajectory = nh.serviceClient<std_srvs::Empty>("/start_trajectory");
+        ros::service::waitForService("/ellipse");
+        m_serviceEllipse = nh.serviceClient<std_srvs::Empty>("/ellipse");
 
         ROS_INFO("Manager ready.");
     }
@@ -79,6 +82,9 @@ private:
             if (msg->buttons[Xbox360Buttons::Blue] == 1 && lastButtonState[Xbox360Buttons::Blue] == 0) {
                 uploadTrajectory();
             }
+            if (msg->buttons[Xbox360Buttons::Green] == 1 && lastButtonState[Xbox360Buttons::Blue] == 0) {
+                ellipse();
+            }
         }
 
         lastButtonState = msg->buttons;
@@ -108,6 +114,12 @@ private:
     {
         std_srvs::Empty srv;
         m_serviceStartTrajectory.call(srv);
+    }
+
+    void ellipse()
+    {
+        std_srvs::Empty srv;
+        m_serviceEllipse.call(srv);
     }
 
     void uploadTrajectory()
@@ -205,6 +217,7 @@ private:
     ros::ServiceClient m_serviceTakeoff;
     ros::ServiceClient m_serviceLand;
     ros::ServiceClient m_serviceStartTrajectory;
+    ros::ServiceClient m_serviceEllipse;
 };
 
 int main(int argc, char **argv)

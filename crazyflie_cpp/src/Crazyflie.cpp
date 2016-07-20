@@ -776,6 +776,12 @@ void CrazyflieBroadcaster::land()
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
+void CrazyflieBroadcaster::ellipse()
+{
+  crtpTrajectoryEllipseRequest request;
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
 void CrazyflieBroadcaster::sendPositionExternal(
   const std::vector<stateExternal>& data)
 {

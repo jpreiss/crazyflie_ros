@@ -538,6 +538,18 @@ struct crtpTrajectoryHoverRequest
     float yaw; // deg
 } __attribute__((packed));
 
+struct crtpTrajectoryEllipseRequest
+{
+  crtpTrajectoryEllipseRequest()
+    : header(14, 1)
+    , command(7)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+} __attribute__((packed));
+
 // struct crtpTrajectoryStateRequest
 // {
 //   crtpTrajectoryStateRequest(uint8_t state)

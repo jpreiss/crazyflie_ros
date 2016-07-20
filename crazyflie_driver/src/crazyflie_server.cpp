@@ -390,6 +390,7 @@ public:
     , m_serviceStartTrajectory()
     , m_serviceTakeoff()
     , m_serviceLand()
+    , m_serviceEllipse()
     , m_listener()
   {
     ros::NodeHandle nhFast;
@@ -404,6 +405,7 @@ public:
     m_serviceStartTrajectory = nhSlow.advertiseService("start_trajectory", &CrazyflieServer::startTrajectory, this);
     m_serviceTakeoff = nhSlow.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
     m_serviceLand = nhSlow.advertiseService("land", &CrazyflieServer::land, this);
+    m_serviceEllipse = nhSlow.advertiseService("ellipse", &CrazyflieServer::ellipse, this);
 
     m_pubPointCloud = nhFast.advertise<sensor_msgs::PointCloud>("pointCloud", 1);
   }
@@ -854,6 +856,20 @@ private:
     return true;
   }
 
+  bool ellipse(
+    std_srvs::Empty::Request& req,
+    std_srvs::Empty::Response& res)
+  {
+    ROS_INFO("Ellipse!");
+
+    for (size_t i = 0; i < 10; ++i) {
+      m_cfbc.ellipse();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    return true;
+  }
+
 //
   void readMarkerConfigurations(
     std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations)
@@ -980,6 +996,7 @@ private:
   ros::ServiceServer m_serviceStartTrajectory;
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
+  ros::ServiceServer m_serviceEllipse;
   ros::Subscriber m_subscribePoses;
 
   ros::Publisher m_pubPointCloud;
