@@ -593,6 +593,7 @@ public:
           totalLatency += elapsedSeconds.count();
           // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
         }
+      }
 
       // send new state estimate to CFs
       // use direct communication if we have only one CF
@@ -626,7 +627,6 @@ public:
       //     ROS_WARN("Not enough poses");
       //   }
       // } else {
-        std::vector<stateExternalBringup> states;
         size_t i = 0;
         for (auto cf : m_cfs) {
           if (tracker.objects()[i].lastTransformationValid()) {
