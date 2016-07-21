@@ -44,6 +44,7 @@ add_service_files(
   AddCrazyflie.srv
   UpdateParams.srv
   UploadTrajectory.srv
+  SetEllipse.srv
 )
 
 add_message_files(

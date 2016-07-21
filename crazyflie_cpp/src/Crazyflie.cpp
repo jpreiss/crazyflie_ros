@@ -438,6 +438,26 @@ void Crazyflie::sendPositionExternalBringup(
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
+void Crazyflie::setEllipse(
+  const vec3& center,
+  const vec3& major,
+  const vec3& minor,
+  float period)
+{
+  crtpTrajectorySetEllipseRequest request;
+  request.data.centerx = position_float2fix(center.x);
+  request.data.centery = position_float2fix(center.y);
+  request.data.centerz = position_float2fix(center.z);
+  request.data.majorx = position_float2fix(major.x);
+  request.data.majory = position_float2fix(major.y);
+  request.data.majorz = position_float2fix(major.z);
+  request.data.minorx = position_float2fix(minor.x);
+  request.data.minory = position_float2fix(minor.y);
+  request.data.minorz = position_float2fix(minor.z);
+  request.data.period = period;
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
 
 bool Crazyflie::sendPacket(
   const uint8_t* data,
@@ -791,7 +811,7 @@ void CrazyflieBroadcaster::land()
 
 void CrazyflieBroadcaster::ellipse()
 {
-  crtpTrajectoryEllipseRequest request;
+  crtpTrajectoryStartEllipseRequest request;
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 

@@ -51,8 +51,8 @@ public:
         m_serviceLand = nh.serviceClient<std_srvs::Empty>("/land");
         ros::service::waitForService("/start_trajectory");
         m_serviceStartTrajectory = nh.serviceClient<std_srvs::Empty>("/start_trajectory");
-        ros::service::waitForService("/ellipse");
-        m_serviceEllipse = nh.serviceClient<std_srvs::Empty>("/ellipse");
+        ros::service::waitForService("/start_ellipse");
+        m_serviceEllipse = nh.serviceClient<std_srvs::Empty>("/start_ellipse");
         ros::service::waitForService("/go_home");
         m_serviceGoHome = nh.serviceClient<std_srvs::Empty>("/go_home");
 

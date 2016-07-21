@@ -8,6 +8,9 @@
 #include "crazyflie_driver/GenericLogData.h"
 #include "crazyflie_driver/UpdateParams.h"
 #include "crazyflie_driver/UploadTrajectory.h"
+#undef major
+#undef minor
+#include "crazyflie_driver/SetEllipse.h"
 #include "std_srvs/Empty.h"
 #include "geometry_msgs/Twist.h"
 #include "sensor_msgs/Imu.h"
@@ -72,11 +75,13 @@ public:
     , m_id(id)
     , m_serviceUpdateParams()
     , m_serviceUploadTrajectory()
+    , m_serviceSetEllipse()
     , m_logBlocks(log_blocks)
   {
     ros::NodeHandle n;
     n.setCallbackQueue(&queue);
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
+    m_serviceSetEllipse = n.advertiseService(tf_prefix + "/set_ellipse", &CrazyflieROS::setEllipse, this);
 
     for (auto& logBlock : m_logBlocks)
     {
@@ -219,6 +224,23 @@ public:
     return true;
   }
 
+  bool setEllipse(
+    crazyflie_driver::SetEllipse::Request& req,
+    crazyflie_driver::SetEllipse::Response& res)
+  {
+    ROS_INFO("[%s] Set ellipse", m_frame.c_str());
+
+    m_cf.setEllipse(
+      {(float)req.center.x, (float)req.center.y, (float)req.center.z},
+      {(float)req.major.x, (float)req.major.y, (float)req.major.z},
+      {(float)req.minor.x, (float)req.minor.y, (float)req.minor.z},
+      req.period.toSec()
+    );
+
+    ROS_INFO("[%s] Set ellipse completed", m_frame.c_str());
+
+    return true;
+  }
 
   // bool prepareTakeoff()
   // {
@@ -228,7 +250,7 @@ public:
   //   m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
 
   //   m_cf.trajectoryReset();
-  //   m_cf.trajectoryAdd(
+  //   m_cf.trajectoryAdd(c
   //     transform.getOrigin().x(),
   //     transform.getOrigin().y(),
   //     transform.getOrigin().z(),
@@ -382,6 +404,7 @@ private:
 
   ros::ServiceServer m_serviceUpdateParams;
   ros::ServiceServer m_serviceUploadTrajectory;
+  ros::ServiceServer m_serviceSetEllipse;
 
   std::vector<crazyflie_driver::LogBlock> m_logBlocks;
   std::vector<ros::Publisher> m_pubLogDataGeneric;
@@ -403,7 +426,7 @@ public:
     , m_serviceStartTrajectory()
     , m_serviceTakeoff()
     , m_serviceLand()
-    , m_serviceEllipse()
+    , m_serviceStartEllipse()
     , m_serviceGoHome()
     , m_listener()
   {
@@ -418,7 +441,7 @@ public:
     m_serviceStartTrajectory = nhSlow.advertiseService("start_trajectory", &CrazyflieServer::startTrajectory, this);
     m_serviceTakeoff = nhSlow.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
     m_serviceLand = nhSlow.advertiseService("land", &CrazyflieServer::land, this);
-    m_serviceEllipse = nhSlow.advertiseService("ellipse", &CrazyflieServer::ellipse, this);
+    m_serviceStartEllipse = nhSlow.advertiseService("start_ellipse", &CrazyflieServer::startEllipse, this);
     m_serviceGoHome = nhSlow.advertiseService("go_home", &CrazyflieServer::goHome, this);
 
     m_pubPointCloud = nhFast.advertise<sensor_msgs::PointCloud>("pointCloud", 1);
@@ -830,7 +853,7 @@ private:
     std_srvs::Empty::Request& req,
     std_srvs::Empty::Response& res)
   {
-    ROS_INFO("Start trajectory");
+    ROS_INFO("Start trajectory!");
 
     for (size_t i = 0; i < 10; ++i) {
       m_cfbc.trajectoryStart();
@@ -840,11 +863,11 @@ private:
     return true;
   }
 
-  bool ellipse(
+  bool startEllipse(
     std_srvs::Empty::Request& req,
     std_srvs::Empty::Response& res)
   {
-    ROS_INFO("Ellipse!");
+    ROS_INFO("Start Ellipse!");
 
     for (size_t i = 0; i < 10; ++i) {
       m_cfbc.ellipse();
@@ -995,7 +1018,7 @@ private:
   ros::ServiceServer m_serviceStartTrajectory;
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
-  ros::ServiceServer m_serviceEllipse;
+  ros::ServiceServer m_serviceStartEllipse;
   ros::ServiceServer m_serviceGoHome;
 
   ros::Publisher m_pubPointCloud;

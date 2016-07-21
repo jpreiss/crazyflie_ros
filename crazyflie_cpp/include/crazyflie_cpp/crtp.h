@@ -479,7 +479,7 @@ struct crtpTrajectoryStartRequest
 {
   crtpTrajectoryStartRequest()
     : header(14, 1)
-    , command(COMMAND_START)
+    , command(COMMAND_START_TRAJECTORY)
     {
     }
 
@@ -541,11 +541,11 @@ struct crtpTrajectoryHoverRequest
     struct data_hover data;
 } __attribute__((packed));
 
-struct crtpTrajectoryEllipseRequest
+struct crtpTrajectoryStartEllipseRequest
 {
-  crtpTrajectoryEllipseRequest()
+  crtpTrajectoryStartEllipseRequest()
     : header(14, 1)
-    , command(COMMAND_ELLIPSE)
+    , command(COMMAND_START_ELLIPSE)
     {
     }
 
@@ -557,12 +557,25 @@ struct crtpTrajectoryGoHomeRequest
 {
   crtpTrajectoryGoHomeRequest()
     : header(14, 1)
-    , command(8)
+    , command(COMMAND_GOHOME)
     {
     }
 
     const crtp header;
     const uint8_t command;
+} __attribute__((packed));
+
+struct crtpTrajectorySetEllipseRequest
+{
+  crtpTrajectorySetEllipseRequest()
+    : header(14, 1)
+    , command(COMMAND_SET_ELLIPSE)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+    struct data_set_ellipse data;
 } __attribute__((packed));
 
 // struct crtpTrajectoryStateRequest

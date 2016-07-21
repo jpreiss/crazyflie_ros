@@ -22,6 +22,12 @@ struct stateExternalBringup{
   float q3;
 };
 
+struct vec3 {
+  float x;
+  float y;
+  float z;
+};
+
 class Crazyflie
 {
 public:
@@ -157,6 +163,12 @@ public:
 
   void sendPositionExternalBringup(
     const stateExternalBringup& data);
+
+  void setEllipse(
+    const vec3& center,
+    const vec3& major,
+    const vec3& minor,
+    float period);
 
   static size_t size(LogType t) {
     switch(t) {
