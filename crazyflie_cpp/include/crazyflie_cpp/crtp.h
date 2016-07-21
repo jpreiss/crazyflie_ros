@@ -1,6 +1,11 @@
 #pragma once
 #include "packetdef.h"
 
+#include <cstdint>
+
+static int const CRTP_MAXSIZE = 31;
+#define CHECKSIZE(s) static_assert(sizeof(s) <= CRTP_MAXSIZE, #s " packet is too large");
+
 // Header
 struct crtp
 {
@@ -37,6 +42,7 @@ struct crtpConsoleResponse
     crtp header;
     char text[31];
 };
+CHECKSIZE(crtpConsoleResponse)
 
 // Port 2 (Parameters)
 
@@ -61,6 +67,7 @@ struct crtpParamTocGetItemRequest
   const uint8_t command;
   uint8_t id;
 } __attribute__((packed));
+CHECKSIZE(crtpParamTocGetItemRequest)
 
 struct crtpParamTocGetItemResponse
 {
@@ -79,6 +86,7 @@ struct crtpParamTocGetItemResponse
   uint8_t group:1;  // one of ParamGroup
   char text[28]; // group, name
 } __attribute__((packed));
+CHECKSIZE(crtpParamTocGetItemResponse)
 
 struct crtpParamTocGetInfoResponse;
 struct crtpParamTocGetInfoRequest
@@ -98,6 +106,7 @@ struct crtpParamTocGetInfoRequest
   const crtp header;
   const uint8_t command;
 } __attribute__((packed));
+CHECKSIZE(crtpParamTocGetInfoRequest)
 
 struct crtpParamTocGetInfoResponse
 {
@@ -111,6 +120,7 @@ struct crtpParamTocGetInfoResponse
   uint8_t numParam;
   uint32_t crc;
 } __attribute__((packed));
+CHECKSIZE(crtpParamTocGetInfoResponse)
 
 struct crtpParamValueResponse;
 struct crtpParamReadRequest
@@ -131,6 +141,7 @@ struct crtpParamReadRequest
   const crtp header;
   const uint8_t id;
 } __attribute__((packed));
+CHECKSIZE(crtpParamReadRequest)
 
 template <class T>
 struct crtpParamWriteRequest
@@ -148,6 +159,7 @@ struct crtpParamWriteRequest
     const uint8_t id;
     const T value;
 } __attribute__((packed));
+CHECKSIZE(crtpParamWriteRequest<double>) // largest kind of param
 
 struct crtpParamValueResponse
 {
@@ -168,6 +180,7 @@ struct crtpParamValueResponse
     float valueFloat;
   };
 } __attribute__((packed));
+CHECKSIZE(crtpParamValueResponse)
 
 // Port 3 (Commander)
 
@@ -191,6 +204,7 @@ struct crtpSetpointRequest
   float yawrate;
   uint16_t thrust;
 }  __attribute__((packed));
+CHECKSIZE(crtpSetpointRequest)
 
 // Port 4 (Memory access)
 
@@ -214,6 +228,7 @@ struct crtpLogGetInfoRequest
   const crtp header;
   const uint8_t command;
 } __attribute__((packed));
+CHECKSIZE(crtpLogGetInfoRequest)
 
 struct crtpLogGetInfoResponse
 {
@@ -233,6 +248,7 @@ struct crtpLogGetInfoResponse
   // Maximum number of operation programmable in the copter. An operation is one log variable retrieval programming
   uint8_t log_max_ops;
 } __attribute__((packed));
+CHECKSIZE(crtpLogGetInfoResponse)
 
 struct crtpLogGetItemResponse;
 struct crtpLogGetItemRequest
@@ -254,6 +270,7 @@ struct crtpLogGetItemRequest
   const uint8_t command;
   uint8_t id;
 } __attribute__((packed));
+CHECKSIZE(crtpLogGetItemRequest)
 
 struct crtpLogGetItemResponse
 {
@@ -267,11 +284,13 @@ struct crtpLogGetItemResponse
     uint8_t type;
     char text[28]; // group, name
 } __attribute__((packed));
+CHECKSIZE(crtpLogGetItemResponse)
 
 struct logBlockItem {
   uint8_t logType;
   uint8_t id;
 } __attribute__((packed));
+CHECKSIZE(logBlockItem )
 
 struct crtpLogCreateBlockRequest
 {
@@ -286,6 +305,7 @@ struct crtpLogCreateBlockRequest
   uint8_t id;
   logBlockItem items[16];
 } __attribute__((packed));
+CHECKSIZE(crtpLogCreateBlockRequest)
 
 // struct logAppendBlockRequest
 // {
@@ -331,6 +351,7 @@ struct crtpLogStartRequest
     uint8_t id;
     uint8_t period; // in increments of 10ms
 } __attribute__((packed));
+CHECKSIZE(crtpLogStartRequest)
 
 struct crtpLogStopRequest
 {
@@ -346,6 +367,7 @@ struct crtpLogStopRequest
     const uint8_t command;
     uint8_t id;
 } __attribute__((packed));
+CHECKSIZE(crtpLogStopRequest)
 
 struct crtpLogResetRequest
 {
@@ -358,6 +380,7 @@ struct crtpLogResetRequest
     const crtp header;
     const uint8_t command;
 } __attribute__((packed));
+CHECKSIZE(crtpLogResetRequest)
 
 struct crtpLogStart2Request
 {
@@ -399,6 +422,7 @@ struct crtpLogControlResponse
     uint8_t requestByte1;
     uint8_t result; // one of crtpLogControlResult
 } __attribute__((packed));
+CHECKSIZE(crtpLogControlResponse)
 
 struct crtpLogDataResponse
 {
@@ -413,6 +437,7 @@ struct crtpLogDataResponse
     uint16_t timestampHi;
     uint8_t data[26];
 } __attribute__((packed));
+CHECKSIZE(crtpLogDataResponse)
 
 // Port 11 (PosExtBringup)
 
@@ -428,6 +453,7 @@ struct crtpPosExtBringup
     const crtp header;
     struct data_vicon data;
 } __attribute__((packed));
+CHECKSIZE(crtpPosExtBringup)
 
 // Port 12 (PosExt)
 
@@ -447,6 +473,7 @@ struct crtpPosExt
       fp16_t yaw; // deg
     } position[3];
 } __attribute__((packed));
+CHECKSIZE(crtpPosExt)
 
 // Port 14 (Trajectory)
 
@@ -461,6 +488,7 @@ struct crtpTrajectoryResetRequest
     const crtp header;
     const uint8_t command;
 } __attribute__((packed));
+CHECKSIZE(crtpTrajectoryResetRequest)
 
 struct crtpTrajectoryAddRequest
 {
@@ -474,6 +502,7 @@ struct crtpTrajectoryAddRequest
     const uint8_t command;
     struct data_add data;
 } __attribute__((packed));
+CHECKSIZE(crtpTrajectoryAddRequest)
 
 struct crtpTrajectoryStartRequest
 {
@@ -486,6 +515,7 @@ struct crtpTrajectoryStartRequest
     const crtp header;
     const uint8_t command;
 } __attribute__((packed));
+CHECKSIZE(crtpTrajectoryStartRequest)
 
 struct crtpTrajectoryTakeoffRequest
 {
@@ -503,6 +533,7 @@ struct crtpTrajectoryTakeoffRequest
     const uint8_t command;
     struct data_takeoff data;
 } __attribute__((packed));
+CHECKSIZE(crtpTrajectoryTakeoffRequest)
 
 struct crtpTrajectoryLandRequest
 {
@@ -520,6 +551,7 @@ struct crtpTrajectoryLandRequest
     const uint8_t command;
     struct data_land data;
 } __attribute__((packed));
+CHECKSIZE(crtpTrajectoryLandRequest)
 
 struct crtpTrajectoryHoverRequest
 {
@@ -564,6 +596,7 @@ struct crtpTrajectoryGoHomeRequest
     const crtp header;
     const uint8_t command;
 } __attribute__((packed));
+CHECKSIZE(crtpTrajectoryHoverRequest)
 
 struct crtpTrajectorySetEllipseRequest
 {
@@ -577,6 +610,7 @@ struct crtpTrajectorySetEllipseRequest
     const uint8_t command;
     struct data_set_ellipse data;
 } __attribute__((packed));
+CHECKSIZE(crtpTrajectoryEllipseRequest)
 
 // struct crtpTrajectoryStateRequest
 // {
@@ -605,6 +639,7 @@ struct crtpTrajectoryResponse
     const uint8_t cmd2;
     const uint8_t result;
 } __attribute__((packed));
+CHECKSIZE(crtpTrajectoryResponse)
 
 // Port 13 (Platform)
 
