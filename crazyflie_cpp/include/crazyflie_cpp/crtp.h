@@ -1,4 +1,5 @@
 #pragma once
+#include "packetdef.h"
 
 // Header
 struct crtp
@@ -425,17 +426,7 @@ struct crtpPosExtBringup
     }
 
     const crtp header;
-    struct {
-      uint8_t id;
-      // fp16_t x; // m
-      // fp16_t y; // m
-      // fp16_t z; // m
-      float x;
-      float y;
-      float z;
-      int16_t quat[4]; //Quaternion; TODO: find more compact way to store this
-                        // each component between -1 and 1
-    } __attribute__((packed)) pose[1];
+    struct data_vicon pose[1];
 } __attribute__((packed));
 
 // Port 12 (PosExt)
@@ -463,7 +454,7 @@ struct crtpTrajectoryResetRequest
 {
   crtpTrajectoryResetRequest()
     : header(14, 1)
-    , command(0)
+    , command(COMMAND_RESET)
     {
     }
 
@@ -475,23 +466,20 @@ struct crtpTrajectoryAddRequest
 {
   crtpTrajectoryAddRequest()
     : header(14, 1)
-    , command(1)
+    , command(COMMAND_ADD)
     {
     }
 
     const crtp header;
     const uint8_t command;
-    uint8_t id;
-    uint8_t offset:5;
-    uint8_t size:3;
-    float values[6];
+    struct data_add data;
 } __attribute__((packed));
 
 struct crtpTrajectoryStartRequest
 {
   crtpTrajectoryStartRequest()
     : header(14, 1)
-    , command(2)
+    , command(COMMAND_START)
     {
     }
 
@@ -505,16 +493,15 @@ struct crtpTrajectoryTakeoffRequest
     float height,
     uint16_t time_from_start)
     : header(14, 1)
-    , command(4)
-    , height(height)
-    , time_from_start(time_from_start)
+    , command(COMMAND_TAKEOFF)
     {
+        data.height = height;
+        data.time_from_start = time_from_start;
     }
 
     const crtp header;
     const uint8_t command;
-    float height; // m (absolute)
-    uint16_t time_from_start; // ms
+    struct data_takeoff data;
 } __attribute__((packed));
 
 struct crtpTrajectoryLandRequest
@@ -523,16 +510,15 @@ struct crtpTrajectoryLandRequest
     float height,
     uint16_t time_from_start)
     : header(14, 1)
-    , command(5)
-    , height(height)
-    , time_from_start(time_from_start)
+    , command(COMMAND_LAND)
     {
+        data.height = height;
+        data.time_from_start = time_from_start;
     }
 
     const crtp header;
     const uint8_t command;
-    float height; // m (absolute)
-    uint16_t time_from_start; // ms
+    struct data_land data;
 } __attribute__((packed));
 
 struct crtpTrajectoryHoverRequest
@@ -544,29 +530,22 @@ struct crtpTrajectoryHoverRequest
     float yaw,
     float duration)
     : header(14, 1)
-    , command(6)
-    , x(x)
-    , y(y)
-    , z(z)
-    , yaw(yaw)
-    , duration(duration)
+    , command(COMMAND_HOVER)
     {
+        data.x = x; data.y = y; data.z = z; data.yaw = yaw; 
+        data.duration = duration;
     }
 
     const crtp header;
     const uint8_t command;
-    float x; // m
-    float y; // m
-    float z; // m
-    float yaw; // deg
-    float duration; // time to reach hover spot
+    struct data_hover data;
 } __attribute__((packed));
 
 struct crtpTrajectoryEllipseRequest
 {
   crtpTrajectoryEllipseRequest()
     : header(14, 1)
-    , command(7)
+    , command(COMMAND_ELLIPSE)
     {
     }
 

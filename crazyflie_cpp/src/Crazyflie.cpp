@@ -7,6 +7,8 @@
 #include "Crazyradio.h"
 #include "CrazyflieUSB.h"
 
+#include "quatcompress.h" // FROM CF FIRMWARE
+
 #include <iostream>
 #include <cstring>
 #include <stdexcept>
@@ -415,16 +417,11 @@ void Crazyflie::sendPositionExternalBringup(
 {
   crtpPosExtBringup request;
   request.pose[0].id = data.id;
-  // request.pose[0].x = single2half(data.x);
-  // request.pose[0].y = single2half(data.y);
-  // request.pose[0].z = single2half(data.z);
-  request.pose[0].x = data.x;
-  request.pose[0].y = data.y;
-  request.pose[0].z = data.z;
-  request.pose[0].quat[0] = int16_t(data.q0 * 32768.0);
-  request.pose[0].quat[1] = int16_t(data.q1 * 32768.0);
-  request.pose[0].quat[2] = int16_t(data.q2 * 32768.0);
-  request.pose[0].quat[3] = int16_t(data.q3 * 32768.0);
+  request.pose[0].x = position_float2fix(data.x);
+  request.pose[0].y = position_float2fix(data.y);
+  request.pose[0].z = position_float2fix(data.z);
+  float q[4] = { data.q0, data.q1, data.q2, data.q3 };
+  request.pose[0].quat = quatcompress(q);
   request.pose[1].id = 0;
   sendPacket((const uint8_t*)&request, sizeof(request));
 }

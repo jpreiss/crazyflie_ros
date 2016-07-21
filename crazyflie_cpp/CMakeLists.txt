@@ -30,6 +30,8 @@ catkin_package(
 ## Additional include folders
 include_directories(
   include/crazyflie_cpp
+  ## YOU HAVE TO CHANGE THIS TO REACH THE CRAZYFLIE FIRMWARE ON YOUR MACHINE
+  ../../../../firm/src/modules/interface/
 )
 
 ## Declare a cpp library
