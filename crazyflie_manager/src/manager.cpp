@@ -36,6 +36,7 @@ public:
         , m_serviceLand()
         , m_serviceStartTrajectory()
         , m_serviceEllipse()
+        , m_serviceGoHome()
     {
         ros::NodeHandle nh;
         m_subscribeJoy = nh.subscribe("/joy", 1, &Manager::joyChanged, this);
@@ -52,8 +53,8 @@ public:
         m_serviceStartTrajectory = nh.serviceClient<std_srvs::Empty>("/start_trajectory");
         ros::service::waitForService("/ellipse");
         m_serviceEllipse = nh.serviceClient<std_srvs::Empty>("/ellipse");
-        // ros::service::waitForService("/hover");
-        // m_serviceEllipse = nh.serviceClient<std_srvs::Empty>("/hover");
+        ros::service::waitForService("/go_home");
+        m_serviceGoHome = nh.serviceClient<std_srvs::Empty>("/go_home");
 
         ROS_INFO("Manager ready.");
     }
@@ -89,9 +90,9 @@ private:
             if (msg->buttons[Xbox360Buttons::Green] == 1 && lastButtonState[Xbox360Buttons::Green] == 0) {
                 ellipse();
             }
-            // if (msg->buttons[Xbox360Buttons::LB] == 1 && lastButtonState[Xbox360Buttons::LB] == 0) {
-            //     hover();
-            // }
+            if (msg->buttons[Xbox360Buttons::LB] == 1 && lastButtonState[Xbox360Buttons::LB] == 0) {
+                goHome();
+            }
         }
 
         lastButtonState = msg->buttons;
@@ -129,11 +130,11 @@ private:
         m_serviceEllipse.call(srv);
     }
 
-    // void hover()
-    // {
-    //     std_srvs::Empty srv;
-    //     m_serviceHover.call(srv);
-    // }
+    void goHome()
+    {
+        std_srvs::Empty srv;
+        m_serviceGoHome.call(srv);
+    }
 
     void uploadTrajectory()
     {
@@ -231,7 +232,7 @@ private:
     ros::ServiceClient m_serviceLand;
     ros::ServiceClient m_serviceStartTrajectory;
     ros::ServiceClient m_serviceEllipse;
-    ros::ServiceClient m_serviceHover;
+    ros::ServiceClient m_serviceGoHome;
 };
 
 int main(int argc, char **argv)

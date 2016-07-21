@@ -553,6 +553,18 @@ struct crtpTrajectoryEllipseRequest
     const uint8_t command;
 } __attribute__((packed));
 
+struct crtpTrajectoryGoHomeRequest
+{
+  crtpTrajectoryGoHomeRequest()
+    : header(14, 1)
+    , command(8)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+} __attribute__((packed));
+
 // struct crtpTrajectoryStateRequest
 // {
 //   crtpTrajectoryStateRequest(uint8_t state)

@@ -83,7 +83,7 @@ public:
       m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(tf_prefix + "/" + logBlock.topic_name, 10));
     }
 
-    m_subscribeJoy = n.subscribe("/joy", 1, &CrazyflieROS::joyChanged, this);
+    // m_subscribeJoy = n.subscribe("/joy", 1, &CrazyflieROS::joyChanged, this);
   }
 
   const std::string& frame() const {
@@ -98,48 +98,48 @@ public:
     m_cf.sendPing();
   }
 
-  void joyChanged(
-        const sensor_msgs::Joy::ConstPtr& msg)
-  {
-    static bool lastState = false;
-    // static float x = 0.0;
-    // static float y = 0.0;
-    // static float z = 1.0;
-    // static float yaw = 0;
-    // bool changed = false;
+  // void joyChanged(
+  //       const sensor_msgs::Joy::ConstPtr& msg)
+  // {
+  //   static bool lastState = false;
+  //   // static float x = 0.0;
+  //   // static float y = 0.0;
+  //   // static float z = 1.0;
+  //   // static float yaw = 0;
+  //   // bool changed = false;
 
-    // float dx = msg->axes[4];
-    // if (fabs(dx) > 0.1) {
-    //   x += dx * 0.01;
-    //   changed = true;
-    // }
-    // float dy = msg->axes[3];
-    // if (fabs(dy) > 0.1) {
-    //   y += dy * 0.01;
-    //   changed = true;
-    // }
-    // float dz = msg->axes[1];
-    // if (fabs(dz) > 0.1) {
-    //   z += dz * 0.01;
-    //   changed = true;
-    // }
-    // float dyaw = msg->axes[0];
-    // if (fabs(dyaw) > 0.1) {
-    //   yaw += dyaw * 1.0;
-    //   changed = true;
-    // }
+  //   // float dx = msg->axes[4];
+  //   // if (fabs(dx) > 0.1) {
+  //   //   x += dx * 0.01;
+  //   //   changed = true;
+  //   // }
+  //   // float dy = msg->axes[3];
+  //   // if (fabs(dy) > 0.1) {
+  //   //   y += dy * 0.01;
+  //   //   changed = true;
+  //   // }
+  //   // float dz = msg->axes[1];
+  //   // if (fabs(dz) > 0.1) {
+  //   //   z += dz * 0.01;
+  //   //   changed = true;
+  //   // }
+  //   // float dyaw = msg->axes[0];
+  //   // if (fabs(dyaw) > 0.1) {
+  //   //   yaw += dyaw * 1.0;
+  //   //   changed = true;
+  //   // }
 
-    // if (changed) {
-    //   ROS_INFO("[%f, %f, %f, %f]", x, y, z, yaw);
-    //   m_cf.trajectoryHover(x, y, z, yaw);
-    // }
+  //   // if (changed) {
+  //   //   ROS_INFO("[%f, %f, %f, %f]", x, y, z, yaw);
+  //   //   m_cf.trajectoryHover(x, y, z, yaw);
+  //   // }
 
-    if (msg->buttons[4] && !lastState) {
-      ROS_INFO("hover!");
-      m_cf.trajectoryHover(0, 0, 1.0, 0, 2.0);
-    }
-    lastState = msg->buttons[4];
-  }
+  //   if (msg->buttons[4] && !lastState) {
+  //     ROS_INFO("hover!");
+  //     m_cf.trajectoryHover(0, 0, 1.0, 0, 2.0);
+  //   }
+  //   lastState = msg->buttons[4];
+  // }
 
 public:
 
@@ -404,6 +404,7 @@ public:
     , m_serviceTakeoff()
     , m_serviceLand()
     , m_serviceEllipse()
+    , m_serviceGoHome()
     , m_listener()
   {
     ros::NodeHandle nhFast;
@@ -418,6 +419,7 @@ public:
     m_serviceTakeoff = nhSlow.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
     m_serviceLand = nhSlow.advertiseService("land", &CrazyflieServer::land, this);
     m_serviceEllipse = nhSlow.advertiseService("ellipse", &CrazyflieServer::ellipse, this);
+    m_serviceGoHome = nhSlow.advertiseService("go_home", &CrazyflieServer::goHome, this);
 
     m_pubPointCloud = nhFast.advertise<sensor_msgs::PointCloud>("pointCloud", 1);
   }
@@ -852,6 +854,20 @@ private:
     return true;
   }
 
+  bool goHome(
+    std_srvs::Empty::Request& req,
+    std_srvs::Empty::Response& res)
+  {
+    ROS_INFO("Go Home!");
+
+    for (size_t i = 0; i < 10; ++i) {
+      m_cfbc.goHome();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    return true;
+  }
+
 //
   void readMarkerConfigurations(
     std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations)
@@ -980,6 +996,7 @@ private:
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
   ros::ServiceServer m_serviceEllipse;
+  ros::ServiceServer m_serviceGoHome;
 
   ros::Publisher m_pubPointCloud;
   tf::TransformBroadcaster m_br;

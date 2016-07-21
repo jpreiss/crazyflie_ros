@@ -310,6 +310,18 @@ void Crazyflie::trajectoryAdd(
     std::cout << poly_x[i] << ",";
   }
   std::cout << std::endl;
+  for (size_t i = 0; i < poly_y.size(); ++i) {
+    std::cout << poly_y[i] << ",";
+  }
+  std::cout << std::endl;
+  for (size_t i = 0; i < poly_z.size(); ++i) {
+    std::cout << poly_z[i] << ",";
+  }
+  std::cout << std::endl;
+  for (size_t i = 0; i < poly_yaw.size(); ++i) {
+    std::cout << poly_yaw[i] << ",";
+  }
+  std::cout << std::endl;
 
   startBatchRequest();
 
@@ -780,6 +792,12 @@ void CrazyflieBroadcaster::land()
 void CrazyflieBroadcaster::ellipse()
 {
   crtpTrajectoryEllipseRequest request;
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
+void CrazyflieBroadcaster::goHome()
+{
+  crtpTrajectoryGoHomeRequest request;
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 

@@ -571,6 +571,7 @@ public:
   void takeoff();
   void land();
   void ellipse();
+  void goHome();
 
   struct stateExternal{
     uint8_t id;
