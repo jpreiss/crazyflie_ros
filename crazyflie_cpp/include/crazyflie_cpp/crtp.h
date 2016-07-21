@@ -6,6 +6,9 @@
 static int const CRTP_MAXSIZE = 31;
 #define CHECKSIZE(s) static_assert(sizeof(s) <= CRTP_MAXSIZE, #s " packet is too large");
 
+static int const CRTP_MAXSIZE_RESPONSE = 32;
+#define CHECKSIZE_RESPONSE(s) static_assert(sizeof(s) <= CRTP_MAXSIZE_RESPONSE, #s " packet is too large");
+
 // Header
 struct crtp
 {
@@ -42,7 +45,7 @@ struct crtpConsoleResponse
     crtp header;
     char text[31];
 };
-CHECKSIZE(crtpConsoleResponse)
+CHECKSIZE_RESPONSE(crtpConsoleResponse)
 
 // Port 2 (Parameters)
 
@@ -86,7 +89,7 @@ struct crtpParamTocGetItemResponse
   uint8_t group:1;  // one of ParamGroup
   char text[28]; // group, name
 } __attribute__((packed));
-CHECKSIZE(crtpParamTocGetItemResponse)
+CHECKSIZE_RESPONSE(crtpParamTocGetItemResponse)
 
 struct crtpParamTocGetInfoResponse;
 struct crtpParamTocGetInfoRequest
@@ -120,7 +123,7 @@ struct crtpParamTocGetInfoResponse
   uint8_t numParam;
   uint32_t crc;
 } __attribute__((packed));
-CHECKSIZE(crtpParamTocGetInfoResponse)
+CHECKSIZE_RESPONSE(crtpParamTocGetInfoResponse)
 
 struct crtpParamValueResponse;
 struct crtpParamReadRequest
@@ -180,7 +183,7 @@ struct crtpParamValueResponse
     float valueFloat;
   };
 } __attribute__((packed));
-CHECKSIZE(crtpParamValueResponse)
+CHECKSIZE_RESPONSE(crtpParamValueResponse)
 
 // Port 3 (Commander)
 
@@ -248,7 +251,7 @@ struct crtpLogGetInfoResponse
   // Maximum number of operation programmable in the copter. An operation is one log variable retrieval programming
   uint8_t log_max_ops;
 } __attribute__((packed));
-CHECKSIZE(crtpLogGetInfoResponse)
+CHECKSIZE_RESPONSE(crtpLogGetInfoResponse)
 
 struct crtpLogGetItemResponse;
 struct crtpLogGetItemRequest
@@ -284,13 +287,12 @@ struct crtpLogGetItemResponse
     uint8_t type;
     char text[28]; // group, name
 } __attribute__((packed));
-CHECKSIZE(crtpLogGetItemResponse)
+CHECKSIZE_RESPONSE(crtpLogGetItemResponse)
 
 struct logBlockItem {
   uint8_t logType;
   uint8_t id;
 } __attribute__((packed));
-CHECKSIZE(logBlockItem )
 
 struct crtpLogCreateBlockRequest
 {
@@ -303,7 +305,7 @@ struct crtpLogCreateBlockRequest
   const crtp header;
   const uint8_t command;
   uint8_t id;
-  logBlockItem items[16];
+  logBlockItem items[14]; // TODO: FIX IN FIRMWARE!
 } __attribute__((packed));
 CHECKSIZE(crtpLogCreateBlockRequest)
 
@@ -422,7 +424,7 @@ struct crtpLogControlResponse
     uint8_t requestByte1;
     uint8_t result; // one of crtpLogControlResult
 } __attribute__((packed));
-CHECKSIZE(crtpLogControlResponse)
+CHECKSIZE_RESPONSE(crtpLogControlResponse)
 
 struct crtpLogDataResponse
 {
@@ -437,7 +439,7 @@ struct crtpLogDataResponse
     uint16_t timestampHi;
     uint8_t data[26];
 } __attribute__((packed));
-CHECKSIZE(crtpLogDataResponse)
+CHECKSIZE_RESPONSE(crtpLogDataResponse)
 
 // Port 11 (PosExtBringup)
 
@@ -610,7 +612,7 @@ struct crtpTrajectorySetEllipseRequest
     const uint8_t command;
     struct data_set_ellipse data;
 } __attribute__((packed));
-CHECKSIZE(crtpTrajectoryEllipseRequest)
+CHECKSIZE(crtpTrajectorySetEllipseRequest)
 
 // struct crtpTrajectoryStateRequest
 // {
@@ -639,7 +641,7 @@ struct crtpTrajectoryResponse
     const uint8_t cmd2;
     const uint8_t result;
 } __attribute__((packed));
-CHECKSIZE(crtpTrajectoryResponse)
+CHECKSIZE_RESPONSE(crtpTrajectoryResponse)
 
 // Port 13 (Platform)
 
