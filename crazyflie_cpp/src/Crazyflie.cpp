@@ -383,9 +383,10 @@ void Crazyflie::trajectoryHover(
     float x,
     float y,
     float z,
-    float yaw)
+    float yaw,
+    float duration)
 {
-  crtpTrajectoryHoverRequest request(x, y, z, yaw);
+  crtpTrajectoryHoverRequest request(x, y, z, yaw, duration);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
@@ -414,9 +415,12 @@ void Crazyflie::sendPositionExternalBringup(
 {
   crtpPosExtBringup request;
   request.pose[0].id = data.id;
-  request.pose[0].x = single2half(data.x);
-  request.pose[0].y = single2half(data.y);
-  request.pose[0].z = single2half(data.z);
+  // request.pose[0].x = single2half(data.x);
+  // request.pose[0].y = single2half(data.y);
+  // request.pose[0].z = single2half(data.z);
+  request.pose[0].x = data.x;
+  request.pose[0].y = data.y;
+  request.pose[0].z = data.z;
   request.pose[0].quat[0] = int16_t(data.q0 * 32768.0);
   request.pose[0].quat[1] = int16_t(data.q1 * 32768.0);
   request.pose[0].quat[2] = int16_t(data.q2 * 32768.0);
@@ -811,9 +815,12 @@ void CrazyflieBroadcaster::sendPositionExternalBringup(
   crtpPosExtBringup request;
   for (size_t i = 0; i < data.size(); ++i) {
     request.pose[0].id = data[i].id;
-    request.pose[0].x = single2half(data[i].x);
-    request.pose[0].y = single2half(data[i].y);
-    request.pose[0].z = single2half(data[i].z);
+    // request.pose[0].x = single2half(data[i].x);
+    // request.pose[0].y = single2half(data[i].y);
+    // request.pose[0].z = single2half(data[i].z);
+    request.pose[0].x = data[i].x;
+    request.pose[0].y = data[i].y;
+    request.pose[0].z = data[i].z;
     request.pose[0].quat[0] = int16_t(data[i].q0 * 32768.0);
     request.pose[0].quat[1] = int16_t(data[i].q1 * 32768.0);
     request.pose[0].quat[2] = int16_t(data[i].q2 * 32768.0);

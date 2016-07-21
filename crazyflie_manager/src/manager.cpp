@@ -16,6 +16,8 @@ namespace Xbox360Buttons {
         Red    = 1,
         Blue   = 2,
         Yellow = 3,
+        LB     = 4,
+        RB     = 5,
         Back   = 6,
         Start  = 7,
         COUNT  = 8,
@@ -50,6 +52,8 @@ public:
         m_serviceStartTrajectory = nh.serviceClient<std_srvs::Empty>("/start_trajectory");
         ros::service::waitForService("/ellipse");
         m_serviceEllipse = nh.serviceClient<std_srvs::Empty>("/ellipse");
+        // ros::service::waitForService("/hover");
+        // m_serviceEllipse = nh.serviceClient<std_srvs::Empty>("/hover");
 
         ROS_INFO("Manager ready.");
     }
@@ -82,9 +86,12 @@ private:
             if (msg->buttons[Xbox360Buttons::Blue] == 1 && lastButtonState[Xbox360Buttons::Blue] == 0) {
                 uploadTrajectory();
             }
-            if (msg->buttons[Xbox360Buttons::Green] == 1 && lastButtonState[Xbox360Buttons::Blue] == 0) {
+            if (msg->buttons[Xbox360Buttons::Green] == 1 && lastButtonState[Xbox360Buttons::Green] == 0) {
                 ellipse();
             }
+            // if (msg->buttons[Xbox360Buttons::LB] == 1 && lastButtonState[Xbox360Buttons::LB] == 0) {
+            //     hover();
+            // }
         }
 
         lastButtonState = msg->buttons;
@@ -121,6 +128,12 @@ private:
         std_srvs::Empty srv;
         m_serviceEllipse.call(srv);
     }
+
+    // void hover()
+    // {
+    //     std_srvs::Empty srv;
+    //     m_serviceHover.call(srv);
+    // }
 
     void uploadTrajectory()
     {
@@ -218,6 +231,7 @@ private:
     ros::ServiceClient m_serviceLand;
     ros::ServiceClient m_serviceStartTrajectory;
     ros::ServiceClient m_serviceEllipse;
+    ros::ServiceClient m_serviceHover;
 };
 
 int main(int argc, char **argv)

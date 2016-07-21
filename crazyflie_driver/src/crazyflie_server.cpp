@@ -35,6 +35,8 @@
 // Object tracker
 #include <libobjecttracker/object_tracker.h>
 
+#include <fstream>
+
 constexpr double pi() { return std::atan(1)*4; }
 
 double degToRad(double deg) {
@@ -99,37 +101,44 @@ public:
   void joyChanged(
         const sensor_msgs::Joy::ConstPtr& msg)
   {
-    static float x = 0.0;
-    static float y = 0.0;
-    static float z = 1.0;
-    static float yaw = 0;
-    bool changed = false;
+    static bool lastState = false;
+    // static float x = 0.0;
+    // static float y = 0.0;
+    // static float z = 1.0;
+    // static float yaw = 0;
+    // bool changed = false;
 
-    float dx = msg->axes[4];
-    if (fabs(dx) > 0.1) {
-      x += dx * 0.01;
-      changed = true;
-    }
-    float dy = msg->axes[3];
-    if (fabs(dy) > 0.1) {
-      y += dy * 0.01;
-      changed = true;
-    }
-    float dz = msg->axes[1];
-    if (fabs(dz) > 0.1) {
-      z += dz * 0.01;
-      changed = true;
-    }
-    float dyaw = msg->axes[0];
-    if (fabs(dyaw) > 0.1) {
-      yaw += dyaw * 1.0;
-      changed = true;
-    }
+    // float dx = msg->axes[4];
+    // if (fabs(dx) > 0.1) {
+    //   x += dx * 0.01;
+    //   changed = true;
+    // }
+    // float dy = msg->axes[3];
+    // if (fabs(dy) > 0.1) {
+    //   y += dy * 0.01;
+    //   changed = true;
+    // }
+    // float dz = msg->axes[1];
+    // if (fabs(dz) > 0.1) {
+    //   z += dz * 0.01;
+    //   changed = true;
+    // }
+    // float dyaw = msg->axes[0];
+    // if (fabs(dyaw) > 0.1) {
+    //   yaw += dyaw * 1.0;
+    //   changed = true;
+    // }
 
-    if (changed) {
-      ROS_INFO("[%f, %f, %f, %f]", x, y, z, yaw);
-      m_cf.trajectoryHover(x, y, z, yaw);
+    // if (changed) {
+    //   ROS_INFO("[%f, %f, %f, %f]", x, y, z, yaw);
+    //   m_cf.trajectoryHover(x, y, z, yaw);
+    // }
+
+    if (msg->buttons[4] && !lastState) {
+      ROS_INFO("hover!");
+      m_cf.trajectoryHover(0, 0, 1.0, 0, 2.0);
     }
+    lastState = msg->buttons[4];
   }
 
 public:
@@ -507,6 +516,11 @@ public:
     msgPointCloud.header.seq = 0;
     msgPointCloud.header.frame_id = "world";
 
+    std::ofstream out("/home/whoenig/projects/phd/crazyswarm2/scripts/vicon.csv");
+    out << "t,x,y,z" << std::endl;
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     while (ros::ok() && !m_isEmergency) {
       // Get a frame
       while (client.GetFrame().Result != Result::Success) {
@@ -536,7 +550,10 @@ public:
           Output_GetSegmentGlobalTranslation translation = client.GetSegmentGlobalTranslation(subjectName, segmentName);
           Output_GetSegmentGlobalRotationQuaternion quaternion = client.GetSegmentGlobalRotationQuaternion(subjectName, segmentName);
 
-          if (!translation.Occluded) {
+          if (   translation.Result == Result::Success
+              && quaternion.Result == Result::Success
+              && !translation.Occluded
+              && !quaternion.Occluded) {
 
             states.resize(states.size() + 1);
             states.back().id = cf->id();
@@ -560,6 +577,8 @@ public:
               quaternion.Rotation[3]);
             transform.setRotation(q);
             m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", cf->frame()));
+          } else {
+            ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
           }
         }
       } else {
@@ -593,40 +612,7 @@ public:
           totalLatency += elapsedSeconds.count();
           // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
         }
-      }
 
-      // send new state estimate to CFs
-      // use direct communication if we have only one CF
-      // This allows us to stream back data
-      // Otherwise, use broadcasts
-      // if (m_cfs.size() == 1) {
-      //   if (msg->poses.size() > 0) {
-      //     bool success = false;
-      //     for (auto& pose: msg->poses) {
-      //       if (pose.name == m_cfs[0]->frame()) {
-      //         stateExternalBringup stateExternalBringup;
-      //         stateExternalBringup.id = m_cfs[0]->id();
-      //         stateExternalBringup.x = pose.pose.position.x;
-      //         stateExternalBringup.y = pose.pose.position.y;
-      //         stateExternalBringup.z = pose.pose.position.z;
-      //         stateExternalBringup.q0 = pose.pose.orientation.x;
-      //         stateExternalBringup.q1 = pose.pose.orientation.y;
-      //         stateExternalBringup.q2 = pose.pose.orientation.z;
-      //         stateExternalBringup.q3 = pose.pose.orientation.w;
-
-      //         m_cfs[0]->sendPositionExternalBringup(
-      //           stateExternalBringup);
-      //         success = true;
-      //         break;
-      //       }
-      //     }
-      //     if (!success) {
-      //       ROS_WARN("Could not find pose for CF %s", m_cfs[0]->frame().c_str());
-      //     }
-      //   } else {
-      //     ROS_WARN("Not enough poses");
-      //   }
-      // } else {
         size_t i = 0;
         for (auto cf : m_cfs) {
           if (tracker.objects()[i].lastTransformationValid()) {
@@ -658,19 +644,27 @@ public:
           }
           ++i;
         }
+      }
 
+      for (const auto& state : states) {
+        std::chrono::duration<double> elapsedSeconds = startIteration-startTime;
+        out << elapsedSeconds.count() << "," << state.x << "," << state.y << "," << state.z << std::endl;
+      }
 
-        {
-          auto start = std::chrono::high_resolution_clock::now();
+      {
+        auto start = std::chrono::high_resolution_clock::now();
+        // if (m_cfs.size() == 1) {
+        //   if (states.size() == 1) {
+        //     m_cfs[0]->sendPositionExternalBringup(states[0]);
+        //   }
+        // } else {
           m_cfbc.sendPositionExternalBringup(states);
-          auto end = std::chrono::high_resolution_clock::now();
-          std::chrono::duration<double> elapsedSeconds = end-start;
-          totalLatency += elapsedSeconds.count();
-          // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
-        }
-
-
-      // }
+        // }
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsedSeconds = end-start;
+        totalLatency += elapsedSeconds.count();
+        // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
+      }
 
       auto endIteration = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> elapsedSeconds = endIteration - startIteration;
@@ -687,7 +681,8 @@ public:
       if (m_cfs.size() == 1) {
         m_cfs[0]->sendPing();
       }
-      m_slowQueue.callAvailable(ros::WallDuration(0.01));
+      m_slowQueue.callAvailable(ros::WallDuration(0));
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 

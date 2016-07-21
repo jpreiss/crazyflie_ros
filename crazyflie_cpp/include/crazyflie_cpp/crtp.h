@@ -358,6 +358,24 @@ struct crtpLogResetRequest
     const uint8_t command;
 } __attribute__((packed));
 
+struct crtpLogStart2Request
+{
+  crtpLogStart2Request(
+    uint8_t id,
+    uint16_t period)
+    : header(5, 1)
+    , command(3)
+    , id(id)
+    , period(period)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+    uint8_t id;
+    uint16_t period; // in increments of 1ms
+} __attribute__((packed));
+
 enum crtpLogControlResult {
   crtpLogControlResultOk            = 0,
   crtpLogControlResultOutOfMemory   = 12, // ENOMEM
@@ -409,12 +427,15 @@ struct crtpPosExtBringup
     const crtp header;
     struct {
       uint8_t id;
-      fp16_t x; // m
-      fp16_t y; // m
-      fp16_t z; // m
+      // fp16_t x; // m
+      // fp16_t y; // m
+      // fp16_t z; // m
+      float x;
+      float y;
+      float z;
       int16_t quat[4]; //Quaternion; TODO: find more compact way to store this
                         // each component between -1 and 1
-    } pose[1];
+    } __attribute__((packed)) pose[1];
 } __attribute__((packed));
 
 // Port 12 (PosExt)
@@ -520,13 +541,15 @@ struct crtpTrajectoryHoverRequest
     float x,
     float y,
     float z,
-    float yaw)
+    float yaw,
+    float duration)
     : header(14, 1)
     , command(6)
     , x(x)
     , y(y)
     , z(z)
     , yaw(yaw)
+    , duration(duration)
     {
     }
 
@@ -536,6 +559,7 @@ struct crtpTrajectoryHoverRequest
     float y; // m
     float z; // m
     float yaw; // deg
+    float duration; // time to reach hover spot
 } __attribute__((packed));
 
 struct crtpTrajectoryEllipseRequest

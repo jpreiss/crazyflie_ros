@@ -152,7 +152,8 @@ public:
     float x,
     float y,
     float z,
-    float yaw);
+    float yaw,
+    float duration);
 
   void sendPositionExternalBringup(
     const stateExternalBringup& data);
