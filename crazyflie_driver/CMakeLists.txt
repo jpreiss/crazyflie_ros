@@ -92,6 +92,8 @@ include_directories(
   # ${libobjecttracker_INCLUDE_DIRS}
   ../externalDependencies/libobjecttracker/include
   ${VICON_SDK_DIR}/include
+  ## YOU HAVE TO CHANGE THIS TO REACH THE CRAZYFLIE FIRMWARE ON YOUR MACHINE
+  ../../../../crazyflie-firmware/src/modules/interface/
 )
 
 link_directories(

@@ -37,6 +37,8 @@ catkin_package(
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ## YOU HAVE TO CHANGE THIS TO REACH THE CRAZYFLIE FIRMWARE ON YOUR MACHINE
+  ../../../../crazyflie-firmware/src/modules/interface/
 )
 
 ## Declare a cpp executable

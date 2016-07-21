@@ -426,7 +426,7 @@ struct crtpPosExtBringup
     }
 
     const crtp header;
-    struct data_vicon pose[1];
+    struct data_vicon data;
 } __attribute__((packed));
 
 // Port 12 (PosExt)
@@ -532,7 +532,7 @@ struct crtpTrajectoryHoverRequest
     : header(14, 1)
     , command(COMMAND_HOVER)
     {
-        data.x = x; data.y = y; data.z = z; data.yaw = yaw; 
+        data.x = x; data.y = y; data.z = z; data.yaw = yaw;
         data.duration = duration;
     }
 

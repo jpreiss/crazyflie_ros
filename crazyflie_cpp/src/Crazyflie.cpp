@@ -303,7 +303,7 @@ void Crazyflie::trajectoryAdd(
     std::vector<float> poly_yaw)
 {
   crtpTrajectoryAddRequest request;
-  request.id = m_lastTrajectoryId;
+  request.data.id = m_lastTrajectoryId;
 
   std::cout << duration << std::endl;
   for (size_t i = 0; i < poly_x.size(); ++i) {
@@ -314,66 +314,66 @@ void Crazyflie::trajectoryAdd(
   startBatchRequest();
 
   // Part 1
-  request.offset = 0;
-  request.size = 6;
-  request.values[0] = duration;
-  request.values[1] = poly_x[0];
-  request.values[2] = poly_x[1];
-  request.values[3] = poly_x[2];
-  request.values[4] = poly_x[3];
-  request.values[5] = poly_x[4];
+  request.data.offset = 0;
+  request.data.size = 6;
+  request.data.values[0] = duration;
+  request.data.values[1] = poly_x[0];
+  request.data.values[2] = poly_x[1];
+  request.data.values[3] = poly_x[2];
+  request.data.values[4] = poly_x[3];
+  request.data.values[5] = poly_x[4];
   addRequest(request, 3);
 
   // Part 2
-  request.offset = 6;
-  request.size = 6;
-  request.values[0] = poly_x[5];
-  request.values[1] = poly_x[6];
-  request.values[2] = poly_x[7];
-  request.values[3] = poly_y[0];
-  request.values[4] = poly_y[1];
-  request.values[5] = poly_y[2];
+  request.data.offset = 6;
+  request.data.size = 6;
+  request.data.values[0] = poly_x[5];
+  request.data.values[1] = poly_x[6];
+  request.data.values[2] = poly_x[7];
+  request.data.values[3] = poly_y[0];
+  request.data.values[4] = poly_y[1];
+  request.data.values[5] = poly_y[2];
   addRequest(request, 3);
 
   // Part 3
-  request.offset = 12;
-  request.size = 6;
-  request.values[0] = poly_y[3];
-  request.values[1] = poly_y[4];
-  request.values[2] = poly_y[5];
-  request.values[3] = poly_y[6];
-  request.values[4] = poly_y[7];
-  request.values[5] = poly_z[0];
+  request.data.offset = 12;
+  request.data.size = 6;
+  request.data.values[0] = poly_y[3];
+  request.data.values[1] = poly_y[4];
+  request.data.values[2] = poly_y[5];
+  request.data.values[3] = poly_y[6];
+  request.data.values[4] = poly_y[7];
+  request.data.values[5] = poly_z[0];
   addRequest(request, 3);
 
   // Part 4
-  request.offset = 18;
-  request.size = 6;
-  request.values[0] = poly_z[1];
-  request.values[1] = poly_z[2];
-  request.values[2] = poly_z[3];
-  request.values[3] = poly_z[4];
-  request.values[4] = poly_z[5];
-  request.values[5] = poly_z[6];
+  request.data.offset = 18;
+  request.data.size = 6;
+  request.data.values[0] = poly_z[1];
+  request.data.values[1] = poly_z[2];
+  request.data.values[2] = poly_z[3];
+  request.data.values[3] = poly_z[4];
+  request.data.values[4] = poly_z[5];
+  request.data.values[5] = poly_z[6];
   addRequest(request, 3);
 
   // Part 5
-  request.offset = 24;
-  request.size = 6;
-  request.values[0] = poly_z[7];
-  request.values[1] = poly_yaw[0];
-  request.values[2] = poly_yaw[1];
-  request.values[3] = poly_yaw[2];
-  request.values[4] = poly_yaw[3];
-  request.values[5] = poly_yaw[4];
+  request.data.offset = 24;
+  request.data.size = 6;
+  request.data.values[0] = poly_z[7];
+  request.data.values[1] = poly_yaw[0];
+  request.data.values[2] = poly_yaw[1];
+  request.data.values[3] = poly_yaw[2];
+  request.data.values[4] = poly_yaw[3];
+  request.data.values[5] = poly_yaw[4];
   addRequest(request, 3);
 
   // Part 6
-  request.offset = 30;
-  request.size = 3;
-  request.values[0] = poly_yaw[5];
-  request.values[1] = poly_yaw[6];
-  request.values[2] = poly_yaw[7];
+  request.data.offset = 30;
+  request.data.size = 3;
+  request.data.values[0] = poly_yaw[5];
+  request.data.values[1] = poly_yaw[6];
+  request.data.values[2] = poly_yaw[7];
   addRequest(request, 3);
 
   handleRequests();
@@ -416,13 +416,13 @@ void Crazyflie::sendPositionExternalBringup(
   const stateExternalBringup& data)
 {
   crtpPosExtBringup request;
-  request.pose[0].id = data.id;
-  request.pose[0].x = position_float2fix(data.x);
-  request.pose[0].y = position_float2fix(data.y);
-  request.pose[0].z = position_float2fix(data.z);
+  request.data.pose[0].id = data.id;
+  request.data.pose[0].x = position_float2fix(data.x);
+  request.data.pose[0].y = position_float2fix(data.y);
+  request.data.pose[0].z = position_float2fix(data.z);
   float q[4] = { data.q0, data.q1, data.q2, data.q3 };
-  request.pose[0].quat = quatcompress(q);
-  request.pose[1].id = 0;
+  request.data.pose[0].quat = quatcompress(q);
+  request.data.pose[1].id = 0;
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
@@ -811,17 +811,15 @@ void CrazyflieBroadcaster::sendPositionExternalBringup(
 {
   crtpPosExtBringup request;
   for (size_t i = 0; i < data.size(); ++i) {
-    request.pose[0].id = data[i].id;
+    request.data.pose[0].id = data[i].id;
     // request.pose[0].x = single2half(data[i].x);
     // request.pose[0].y = single2half(data[i].y);
     // request.pose[0].z = single2half(data[i].z);
-    request.pose[0].x = data[i].x;
-    request.pose[0].y = data[i].y;
-    request.pose[0].z = data[i].z;
-    request.pose[0].quat[0] = int16_t(data[i].q0 * 32768.0);
-    request.pose[0].quat[1] = int16_t(data[i].q1 * 32768.0);
-    request.pose[0].quat[2] = int16_t(data[i].q2 * 32768.0);
-    request.pose[0].quat[3] = int16_t(data[i].q3 * 32768.0);
+    request.data.pose[0].x = position_float2fix(data[i].x);
+    request.data.pose[0].y = position_float2fix(data[i].y);
+    request.data.pose[0].z = position_float2fix(data[i].z);
+    float q[4] = { data[i].q0, data[i].q1, data[i].q2, data[i].q3 };
+    request.data.pose[0].quat = quatcompress(q);
     sendPacket((const uint8_t*)&request, sizeof(request));
   }
   // request.pose[0].id = 0;
