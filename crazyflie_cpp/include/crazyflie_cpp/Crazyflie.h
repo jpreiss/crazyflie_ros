@@ -98,6 +98,9 @@ public:
 
   void reboot();
   void rebootToBootloader();
+  void sysoff();
+  void alloff();
+  void syson();
 
   void requestLogToc();
 
@@ -169,6 +172,14 @@ public:
     const vec3& major,
     const vec3& minor,
     float period);
+
+  void takeoff(
+    float targetHeight,
+    uint16_t time_in_ms);
+
+  void land(
+    float targetHeight,
+    uint16_t time_in_ms);
 
   static size_t size(LogType t) {
     switch(t) {
@@ -393,7 +404,9 @@ private:
       m_callback(time_in_ms, t);
     }
     else {
-      throw std::runtime_error("Size doesn't match!");
+      std::stringstream sstr;
+      sstr << "Size doesn't match! Is: " << (size_t)size << " expected: " << sizeof(T);
+      throw std::runtime_error(sstr.str());
     }
   }
 
@@ -580,8 +593,14 @@ public:
   void trajectoryStart();
   // void setTrajectoryState(bool state);
 
-  void takeoff();
-  void land();
+  void takeoff(
+    float targetHeight,
+    uint16_t time_in_ms);
+
+  void land(
+    float targetHeight,
+    uint16_t time_in_ms);
+
   void ellipse();
   void goHome();
 

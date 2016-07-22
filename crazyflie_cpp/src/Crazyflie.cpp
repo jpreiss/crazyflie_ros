@@ -152,6 +152,25 @@ void Crazyflie::rebootToBootloader()
   while(!sendPacket(reboot_to_bootloader, sizeof(reboot_to_bootloader))) {}
 }
 
+// needs custom nrf firmware
+void Crazyflie::sysoff()
+{
+  const uint8_t shutdown[] = {0xFF, 0xFE, 0x02};
+  while(!sendPacket(shutdown, sizeof(shutdown))) {}
+}
+
+void Crazyflie::alloff()
+{
+  const uint8_t shutdown[] = {0xFF, 0xFE, 0x01};
+  while(!sendPacket(shutdown, sizeof(shutdown))) {}
+}
+
+void Crazyflie::syson()
+{
+  const uint8_t shutdown[] = {0xFF, 0xFE, 0x03};
+  while(!sendPacket(shutdown, sizeof(shutdown))) {}
+}
+
 void Crazyflie::requestLogToc()
 {
   // Find the number of log variables in TOC
@@ -401,7 +420,9 @@ void Crazyflie::trajectoryHover(
     float duration)
 {
   crtpTrajectoryHoverRequest request(x, y, z, yaw, duration);
-  sendPacket((const uint8_t*)&request, sizeof(request));
+  startBatchRequest();
+  addRequest(request, 2);
+  handleRequests();
 }
 
 // void Crazyflie::trajectoryStart()
@@ -455,7 +476,32 @@ void Crazyflie::setEllipse(
   request.data.minory = position_float2fix(minor.y);
   request.data.minorz = position_float2fix(minor.z);
   request.data.period = period;
-  sendPacket((const uint8_t*)&request, sizeof(request));
+
+  startBatchRequest();
+  addRequest(request, 2);
+  handleRequests();
+}
+
+void Crazyflie::takeoff(
+  float targetHeight,
+  uint16_t time_in_ms)
+{
+  crtpTrajectoryTakeoffRequest request(targetHeight, time_in_ms);
+
+  startBatchRequest();
+  addRequest(request, 2);
+  handleRequests();
+}
+
+void Crazyflie::land(
+  float targetHeight,
+  uint16_t time_in_ms)
+{
+  crtpTrajectoryTakeoffRequest request(targetHeight, time_in_ms);
+
+  startBatchRequest();
+  addRequest(request, 2);
+  handleRequests();
 }
 
 
@@ -797,15 +843,21 @@ void CrazyflieBroadcaster::trajectoryStart()
 //   sendPacket((const uint8_t*)&request, sizeof(request));
 // }
 
-void CrazyflieBroadcaster::takeoff()
+void CrazyflieBroadcaster::takeoff(
+  float targetHeight,
+  uint16_t time_in_ms)
 {
-  crtpTrajectoryTakeoffRequest request(1.0, 2000);
+  // crtpTrajectoryTakeoffRequest request(1.0, 2000);
+  crtpTrajectoryTakeoffRequest request(targetHeight, time_in_ms);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
-void CrazyflieBroadcaster::land()
+void CrazyflieBroadcaster::land(
+  float targetHeight,
+  uint16_t time_in_ms)
 {
-  crtpTrajectoryLandRequest request(0.06, 2000);
+  // crtpTrajectoryLandRequest request(0.06, 2000);
+  crtpTrajectoryLandRequest request(targetHeight, time_in_ms);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
@@ -848,33 +900,23 @@ void CrazyflieBroadcaster::sendPositionExternalBringup(
   const std::vector<stateExternalBringup>& data)
 {
   crtpPosExtBringup request;
+  request.data.pose[0].id = 0;
+  request.data.pose[1].id = 0;
   for (size_t i = 0; i < data.size(); ++i) {
-    request.data.pose[0].id = data[i].id;
-    // request.pose[0].x = single2half(data[i].x);
-    // request.pose[0].y = single2half(data[i].y);
-    // request.pose[0].z = single2half(data[i].z);
-    request.data.pose[0].x = position_float2fix(data[i].x);
-    request.data.pose[0].y = position_float2fix(data[i].y);
-    request.data.pose[0].z = position_float2fix(data[i].z);
+    request.data.pose[i%2].id = data[i].id;
+    request.data.pose[i%2].x = position_float2fix(data[i].x);
+    request.data.pose[i%2].y = position_float2fix(data[i].y);
+    request.data.pose[i%2].z = position_float2fix(data[i].z);
     float q[4] = { data[i].q0, data[i].q1, data[i].q2, data[i].q3 };
-    request.data.pose[0].quat = quatcompress(q);
-    sendPacket((const uint8_t*)&request, sizeof(request));
+    //request.data.qx = data[i].q0;
+    //request.data.qy = data[i].q1;
+    //request.data.qz = data[i].q2;
+    //request.data.qw = data[i].q3;
+    request.data.pose[i%2].quat = quatcompress(q);
+    if (i%2 == 1 || i == data.size() - 1) {
+      sendPacket((const uint8_t*)&request, sizeof(request));
+      request.data.pose[0].id = 0;
+      request.data.pose[1].id = 0;
+    }
   }
-  // request.pose[0].id = 0;
-  // request.pose[1].id = 0;
-  // for (size_t i = 0; i < data.size(); ++i) {
-  //   request.pose[i%2].id = data[i].id;
-  //   request.pose[i%2].x = single2half(data[i].x);
-  //   request.pose[i%2].y = single2half(data[i].y);
-  //   request.pose[i%2].z = single2half(data[i].z);
-  //   request.pose[i%2].quat[0] = int16_t(data[i].q0 * 32768.0);
-  //   request.pose[i%2].quat[1] = int16_t(data[i].q1 * 32768.0);
-  //   request.pose[i%2].quat[2] = int16_t(data[i].q2 * 32768.0);
-  //   request.pose[i%2].quat[3] = int16_t(data[i].q3 * 32768.0);
-  //   if (i%2 == 1 || i == data.size() - 1) {
-  //     sendPacket((const uint8_t*)&request, sizeof(request));
-  //     request.pose[0].id = 0;
-  //     request.pose[1].id = 0;
-  //   }
-  // }
 }

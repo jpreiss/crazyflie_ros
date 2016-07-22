@@ -11,6 +11,9 @@
 #undef major
 #undef minor
 #include "crazyflie_driver/SetEllipse.h"
+#include "crazyflie_driver/Takeoff.h"
+#include "crazyflie_driver/Land.h"
+#include "crazyflie_driver/Hover.h"
 #include "std_srvs/Empty.h"
 #include "geometry_msgs/Twist.h"
 #include "sensor_msgs/Imu.h"
@@ -76,12 +79,19 @@ public:
     , m_serviceUpdateParams()
     , m_serviceUploadTrajectory()
     , m_serviceSetEllipse()
+    , m_serviceTakeoff()
+    , m_serviceLand()
+    , m_serviceHover()
     , m_logBlocks(log_blocks)
   {
     ros::NodeHandle n;
     n.setCallbackQueue(&queue);
     m_serviceUploadTrajectory = n.advertiseService(tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
     m_serviceSetEllipse = n.advertiseService(tf_prefix + "/set_ellipse", &CrazyflieROS::setEllipse, this);
+    m_serviceTakeoff = n.advertiseService(tf_prefix + "/takeoff", &CrazyflieROS::takeoff, this);
+    m_serviceLand = n.advertiseService(tf_prefix + "/land", &CrazyflieROS::land, this);
+    m_serviceHover = n.advertiseService(tf_prefix + "/hover", &CrazyflieROS::hover, this);
+
 
     for (auto& logBlock : m_logBlocks)
     {
@@ -238,6 +248,39 @@ public:
     );
 
     ROS_INFO("[%s] Set ellipse completed", m_frame.c_str());
+
+    return true;
+  }
+
+  bool takeoff(
+    crazyflie_driver::Takeoff::Request& req,
+    crazyflie_driver::Takeoff::Response& res)
+  {
+    ROS_INFO("Takeoff!");
+
+    m_cf.takeoff(req.height, req.time_from_start.toSec() * 1000);
+
+    return true;
+  }
+
+  bool land(
+    crazyflie_driver::Land::Request& req,
+    crazyflie_driver::Land::Response& res)
+  {
+    ROS_INFO("Land!");
+
+    m_cf.land(req.height, req.time_from_start.toSec() * 1000);
+
+    return true;
+  }
+
+  bool hover(
+    crazyflie_driver::Hover::Request& req,
+    crazyflie_driver::Hover::Response& res)
+  {
+    ROS_INFO("Hover!");
+
+    m_cf.trajectoryHover(req.goal.x, req.goal.y, req.goal.z, req.yaw, req.duration.toSec());
 
     return true;
   }
@@ -405,6 +448,10 @@ private:
   ros::ServiceServer m_serviceUpdateParams;
   ros::ServiceServer m_serviceUploadTrajectory;
   ros::ServiceServer m_serviceSetEllipse;
+  ros::ServiceServer m_serviceTakeoff;
+  ros::ServiceServer m_serviceLand;
+  ros::ServiceServer m_serviceHover;
+
 
   std::vector<crazyflie_driver::LogBlock> m_logBlocks;
   std::vector<ros::Publisher> m_pubLogDataGeneric;
@@ -476,6 +523,23 @@ public:
 
   void runFast()
   {
+
+    // std::vector<stateExternalBringup> states(1);
+    // states.back().id = 07;
+    // states.back().q0 = 0;
+    // states.back().q1 = 0;
+    // states.back().q2 = 0;
+    // states.back().q3 = 1;
+
+
+    // while(ros::ok()) {
+
+    //   m_cfbc.sendPositionExternalBringup(states);
+    //   // m_cfs[0]->sendPositionExternalBringup(states[0]);
+    //   m_fastQueue.callAvailable(ros::WallDuration(0));
+    //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // }
+    // return;
 
     std::vector<libobjecttracker::DynamicsConfiguration> dynamicsConfigurations;
     std::vector<libobjecttracker::MarkerConfiguration> markerConfigurations;
@@ -703,9 +767,9 @@ public:
   void runSlow()
   {
     while(ros::ok() && !m_isEmergency) {
-      if (m_cfs.size() == 1) {
-        m_cfs[0]->sendPing();
-      }
+      // if (m_cfs.size() == 1) {
+      //   m_cfs[0]->sendPing();
+      // }
       m_slowQueue.callAvailable(ros::WallDuration(0));
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -822,13 +886,13 @@ private:
   }
 
   bool takeoff(
-    std_srvs::Empty::Request& req,
-    std_srvs::Empty::Response& res)
+    crazyflie_driver::Takeoff::Request& req,
+    crazyflie_driver::Takeoff::Response& res)
   {
     ROS_INFO("Takeoff!");
 
     for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.takeoff();
+      m_cfbc.takeoff(req.height, req.time_from_start.toSec() * 1000);
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
@@ -836,13 +900,13 @@ private:
   }
 
   bool land(
-    std_srvs::Empty::Request& req,
-    std_srvs::Empty::Response& res)
+    crazyflie_driver::Land::Request& req,
+    crazyflie_driver::Land::Response& res)
   {
     ROS_INFO("Land!");
 
     for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.land();
+      m_cfbc.land(req.height, req.time_from_start.toSec() * 1000);
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
@@ -1089,11 +1153,17 @@ int main(int argc, char **argv)
   nGlobal.getParam("crazyflies", crazyflies);
   ROS_ASSERT(crazyflies.getType() == XmlRpc::XmlRpcValue::TypeArray);
 
+  std::set<std::string> cfIds;
   for (int32_t i = 0; i < crazyflies.size(); ++i)
   {
     ROS_ASSERT(crazyflies[i].getType() == XmlRpc::XmlRpcValue::TypeStruct);
     XmlRpc::XmlRpcValue crazyflie = crazyflies[i];
     std::string id = crazyflie["id"];
+    if (cfIds.find(id) != cfIds.end()) {
+      ROS_FATAL("CF with the same id twice in configuration!");
+      return 1;
+    }
+    cfIds.insert(id);
     // XmlRpc::XmlRpcValue pos = crazyflie["initialPosition"];
     // ROS_ASSERT(pos.getType() == XmlRpc::XmlRpcValue::TypeArray);
     // for (int32_t j = 0; j < pos.size(); ++j)

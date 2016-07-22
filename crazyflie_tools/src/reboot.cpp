@@ -7,6 +7,9 @@ enum Mode
 {
   RebootToFirmware,
   RebootToBootloader,
+  SysOff,
+  SysOn,
+  AllOff,
 };
 
 std::istream& operator>>(std::istream& in, Mode& mode)
@@ -18,6 +21,12 @@ std::istream& operator>>(std::istream& in, Mode& mode)
     mode = RebootToFirmware;
   else if (token == "bootloader")
     mode = RebootToBootloader;
+  else if (token == "sysoff")
+    mode = SysOff;
+  else if (token == "syson")
+    mode = SysOn;
+  else if (token == "alloff")
+    mode = AllOff;
   else throw boost::program_options::validation_error(boost::program_options::validation_error::invalid_option_value);
   return in;
 }
@@ -35,7 +44,7 @@ int main(int argc, char **argv)
   desc.add_options()
     ("help", "produce help message")
     ("uri", po::value<std::string>(&uri)->default_value(defaultUri), "unique ressource identifier")
-    ("mode", po::value<Mode>(&mode)->default_value(mode), "reboot mode {firmware,bootloader}")
+    ("mode", po::value<Mode>(&mode)->default_value(mode), "reboot mode {firmware,bootloader,shutdown}")
   ;
 
   try
@@ -67,6 +76,15 @@ int main(int argc, char **argv)
         break;
       case RebootToBootloader:
         cf.rebootToBootloader();
+        break;
+      case SysOff:
+        cf.sysoff();
+        break;
+      case SysOn:
+        cf.syson();
+        break;
+      case AllOff:
+        cf.alloff();
         break;
     }
 

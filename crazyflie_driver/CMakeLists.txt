@@ -45,6 +45,9 @@ add_service_files(
   UpdateParams.srv
   UploadTrajectory.srv
   SetEllipse.srv
+  Hover.srv
+  Takeoff.srv
+  Land.srv
 )
 
 add_message_files(

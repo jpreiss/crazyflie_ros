@@ -8,6 +8,9 @@
 #include <std_srvs/Empty.h>
 
 #include <crazyflie_driver/UploadTrajectory.h>
+#include <crazyflie_driver/Takeoff.h>
+#include <crazyflie_driver/Land.h>
+
 
 namespace Xbox360Buttons {
 
@@ -46,9 +49,9 @@ public:
         ros::service::waitForService("/emergency");
         m_serviceEmergency = nh.serviceClient<std_srvs::Empty>("/emergency");
         ros::service::waitForService("/takeoff");
-        m_serviceTakeoff = nh.serviceClient<std_srvs::Empty>("/takeoff");
+        m_serviceTakeoff = nh.serviceClient<crazyflie_driver::Takeoff>("/takeoff");
         ros::service::waitForService("/land");
-        m_serviceLand = nh.serviceClient<std_srvs::Empty>("/land");
+        m_serviceLand = nh.serviceClient<crazyflie_driver::Land>("/land");
         ros::service::waitForService("/start_trajectory");
         m_serviceStartTrajectory = nh.serviceClient<std_srvs::Empty>("/start_trajectory");
         ros::service::waitForService("/start_ellipse");
@@ -108,13 +111,17 @@ private:
 
     void takeoff()
     {
-        std_srvs::Empty srv;
+        crazyflie_driver::Takeoff srv;
+        srv.request.height = 1.0;
+        srv.request.time_from_start = ros::Duration(2.0);
         m_serviceTakeoff.call(srv);
     }
 
     void land()
     {
-        std_srvs::Empty srv;
+        crazyflie_driver::Land srv;
+        srv.request.height = 0.06;
+        srv.request.time_from_start = ros::Duration(2.0);
         m_serviceLand.call(srv);
     }
 
