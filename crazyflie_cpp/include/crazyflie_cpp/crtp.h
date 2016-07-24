@@ -450,6 +450,8 @@ struct crtpPosExtBringup
   crtpPosExtBringup()
     : header(11, 1)
     {
+      data.pose[0].id = 0;
+      data.pose[1].id = 0;
     }
 
     const crtp header;

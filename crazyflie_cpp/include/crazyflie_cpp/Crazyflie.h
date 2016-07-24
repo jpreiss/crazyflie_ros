@@ -604,24 +604,15 @@ public:
   void ellipse();
   void goHome();
 
-  struct stateExternal{
-    uint8_t id;
-    float x;
-    float y;
-    float z;
-    float yaw;
-  };
-
-  // Data needs to be consecutive entries, starting from startId
-  // If it doesn't fit in one packet, driver will automatically split
-  void sendPositionExternal(
-    const std::vector<stateExternal>& data);
-
   void sendPositionExternalBringup(
     const std::vector<stateExternalBringup>& data);
 
 protected:
   void sendPacket(
+    const uint8_t* data,
+    uint32_t length);
+
+  void send2Packets(
     const uint8_t* data,
     uint32_t length);
 

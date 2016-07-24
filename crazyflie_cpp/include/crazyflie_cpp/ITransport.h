@@ -31,4 +31,12 @@ public:
   virtual void sendPacketNoAck(
     const uint8_t* data,
     uint32_t length) = 0;
+
+  virtual void send2PacketsNoAck(
+      const uint8_t* data,
+      uint32_t totalLength)
+  {
+    sendPacketNoAck(data, totalLength / 2);
+    sendPacketNoAck(data + totalLength / 2, totalLength / 2);
+  }
 };

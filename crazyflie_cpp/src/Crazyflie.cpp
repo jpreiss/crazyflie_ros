@@ -813,22 +813,40 @@ void CrazyflieBroadcaster::sendPacket(
   const uint8_t* data,
   uint32_t length)
 {
-  {
-    std::unique_lock<std::mutex> mlock(g_radioMutex[m_devId]);
-    if (m_radio->getAddress() != m_address) {
-      m_radio->setAddress(m_address);
-    }
-    if (m_radio->getChannel() != m_channel) {
-      m_radio->setChannel(m_channel);
-    }
-    if (m_radio->getDatarate() != m_datarate) {
-      m_radio->setDatarate(m_datarate);
-    }
-    if (m_radio->getAckEnable()) {
-      m_radio->setAckEnable(false);
-    }
-    m_radio->sendPacketNoAck(data, length);
+  std::unique_lock<std::mutex> mlock(g_radioMutex[m_devId]);
+  if (m_radio->getAddress() != m_address) {
+    m_radio->setAddress(m_address);
   }
+  if (m_radio->getChannel() != m_channel) {
+    m_radio->setChannel(m_channel);
+  }
+  if (m_radio->getDatarate() != m_datarate) {
+    m_radio->setDatarate(m_datarate);
+  }
+  if (m_radio->getAckEnable()) {
+    m_radio->setAckEnable(false);
+  }
+  m_radio->sendPacketNoAck(data, length);
+}
+
+void CrazyflieBroadcaster::send2Packets(
+  const uint8_t* data,
+  uint32_t length)
+{
+  std::unique_lock<std::mutex> mlock(g_radioMutex[m_devId]);
+  if (m_radio->getAddress() != m_address) {
+    m_radio->setAddress(m_address);
+  }
+  if (m_radio->getChannel() != m_channel) {
+    m_radio->setChannel(m_channel);
+  }
+  if (m_radio->getDatarate() != m_datarate) {
+    m_radio->setDatarate(m_datarate);
+  }
+  if (m_radio->getAckEnable()) {
+    m_radio->setAckEnable(false);
+  }
+  m_radio->send2PacketsNoAck(data, length);
 }
 
 void CrazyflieBroadcaster::trajectoryStart()
@@ -873,50 +891,35 @@ void CrazyflieBroadcaster::goHome()
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
-void CrazyflieBroadcaster::sendPositionExternal(
-  const std::vector<stateExternal>& data)
-{
-  crtpPosExt request;
-  request.position[0].id = 0;
-  request.position[1].id = 0;
-  request.position[2].id = 0;
-  for (size_t i = 0; i < data.size(); ++i) {
-    request.position[i%3].id = data[i].id;
-    request.position[i%3].x = single2half(data[i].x);
-    request.position[i%3].y = single2half(data[i].y);
-    request.position[i%3].z = single2half(data[i].z);
-    request.position[i%3].yaw = single2half(data[i].yaw);
-    if (i%3 == 2 || i == data.size() - 1) {
-      sendPacket((const uint8_t*)&request, sizeof(request));
-      request.position[0].id = 0;
-      request.position[1].id = 0;
-      request.position[2].id = 0;
-    }
-    // std::this_thread::sleep_for(std::chrono::microseconds(5000));
-  }
-}
-
 void CrazyflieBroadcaster::sendPositionExternalBringup(
   const std::vector<stateExternalBringup>& data)
 {
-  crtpPosExtBringup request;
-  request.data.pose[0].id = 0;
-  request.data.pose[1].id = 0;
+  if (data.size() == 0) {
+    return;
+  }
+
+  std::vector<crtpPosExtBringup> requests(ceil(data.size() / 2.0));
   for (size_t i = 0; i < data.size(); ++i) {
-    request.data.pose[i%2].id = data[i].id;
-    request.data.pose[i%2].x = position_float2fix(data[i].x);
-    request.data.pose[i%2].y = position_float2fix(data[i].y);
-    request.data.pose[i%2].z = position_float2fix(data[i].z);
+    size_t j = i / 2;
+    requests[j].data.pose[i%2].id = data[i].id;
+    requests[j].data.pose[i%2].x = position_float2fix(data[i].x);
+    requests[j].data.pose[i%2].y = position_float2fix(data[i].y);
+    requests[j].data.pose[i%2].z = position_float2fix(data[i].z);
     float q[4] = { data[i].q0, data[i].q1, data[i].q2, data[i].q3 };
-    //request.data.qx = data[i].q0;
-    //request.data.qy = data[i].q1;
-    //request.data.qz = data[i].q2;
-    //request.data.qw = data[i].q3;
-    request.data.pose[i%2].quat = quatcompress(q);
-    if (i%2 == 1 || i == data.size() - 1) {
-      sendPacket((const uint8_t*)&request, sizeof(request));
-      request.data.pose[0].id = 0;
-      request.data.pose[1].id = 0;
+    requests[j].data.pose[i%2].quat = quatcompress(q);
+  }
+
+  size_t remainingRequests = requests.size();
+  size_t i = 0;
+  while (remainingRequests > 0) {
+    if (remainingRequests >= 2) {
+      send2Packets(reinterpret_cast<const uint8_t*>(&requests[i]), 2 * sizeof(crtpPosExtBringup));
+      remainingRequests -= 2;
+      i += 2;
+    } else {
+      sendPacket(reinterpret_cast<const uint8_t*>(&requests[i]), sizeof(crtpPosExtBringup));
+      remainingRequests -= 1;
+      i += 1;
     }
   }
 }
