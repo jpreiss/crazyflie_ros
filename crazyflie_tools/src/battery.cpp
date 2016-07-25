@@ -53,6 +53,7 @@ int main(int argc, char **argv)
   try
   {
     Crazyflie cf(uri);
+    cf.logReset();
     cf.requestLogToc();
 
     std::unique_ptr<LogBlock<struct log> > logBlock;
