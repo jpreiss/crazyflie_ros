@@ -220,3 +220,37 @@ void Crazyradio::sendPacketNoAck(
     //     std::cout << "#packets: " << m_numPacketsSent << std::endl;
     // }
 }
+
+void Crazyradio::send2PacketsNoAck(
+    const uint8_t* data,
+    uint32_t totalLength)
+{
+    int status;
+    int transferred;
+
+    if (!m_handle) {
+        throw std::runtime_error("No valid device handle!");
+    }
+
+    // Send data
+    status = libusb_bulk_transfer(
+        m_handle,
+        /* endpoint*/ (0x01 | LIBUSB_ENDPOINT_OUT),
+        (uint8_t*)data,
+        totalLength,
+        &transferred,
+        /*timeout*/ 1000);
+    if (status != LIBUSB_SUCCESS) {
+        throw std::runtime_error(libusb_error_name(status));
+    }
+    if (totalLength != transferred) {
+        std::stringstream sstr;
+        sstr << "Did transfer " << transferred << " but " << totalLength << " was requested!";
+        throw std::runtime_error(sstr.str());
+    }
+
+    m_numPacketsSent += 2;
+    // if (m_numPacketsSent % 100 == 0) {
+    //     std::cout << "#packets: " << m_numPacketsSent << std::endl;
+    // }
+}
