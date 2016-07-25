@@ -42,6 +42,7 @@
 
 // Object tracker
 #include <libobjecttracker/object_tracker.h>
+#include <libobjecttracker/cloudlog.hpp>
 
 #include <fstream>
 
@@ -829,11 +830,16 @@ public:
     std::string hostName;
     std::string broadcastAddress;
     bool useViconTracker;
+    std::string logFilePath;
 
     ros::NodeHandle nl("~");
     nl.getParam("host_name", hostName);
     nl.getParam("use_vicon_tracker", useViconTracker);
     nl.getParam("broadcast_address", broadcastAddress);
+    nl.param<std::string>("save_point_clouds", logFilePath, "");
+
+    libobjecttracker::PointCloudLogger pointCloudLogger(logFilePath);
+    const bool logClouds = !logFilePath.empty();
 
     // custom log blocks
     std::vector<std::string> genericLogTopics;
@@ -966,6 +972,10 @@ public:
           msgPointCloud.points[i].z = translation.Translation[2] / 1000.0;
         }
         m_pubPointCloud.publish(msgPointCloud);
+
+        if (logClouds) {
+          pointCloudLogger.log(markers);
+        }
       }
 
       std::unique_lock<std::mutex> lck(g_mutex);
@@ -978,6 +988,10 @@ public:
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
 
       // m_fastQueue.callAvailable(ros::WallDuration(0));
+    }
+
+    if (logClouds) {
+      pointCloudLogger.flush();
     }
 
     // wait for other threads
