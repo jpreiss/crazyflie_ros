@@ -235,7 +235,7 @@ void Crazyradio::send2PacketsNoAck(
     // Send data
     status = libusb_bulk_transfer(
         m_handle,
-        /* endpoint*/ (0x02 | LIBUSB_ENDPOINT_OUT),
+        /* endpoint*/ (0x01 | LIBUSB_ENDPOINT_OUT),
         (uint8_t*)data,
         totalLength,
         &transferred,
