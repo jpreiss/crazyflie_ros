@@ -480,7 +480,8 @@ public:
     uint32_t seq = 0;
     std::unique_lock<std::mutex> lck(g_mutex);
     while(ros::ok() && !m_isEmergency) {
-      while(g_seq <= seq) g_conditionVariable.wait(lck);
+      g_conditionVariable.wait(lck, [seq]{return g_seq > seq;});
+      ++seq;
 
       std::vector<stateExternalBringup> states;
       if (m_useViconTracker) {
@@ -882,7 +883,10 @@ public:
           logBlocks));
       threads.push_back(std::thread(&CrazyflieGroup::runFast, m_groups.back()));
       threads.push_back(std::thread(&CrazyflieGroup::runSlow, m_groups.back()));
+      ++radio;
     }
+
+    ROS_INFO("Started %lu threads", threads.size());
 
     // Connect to a server
     ROS_INFO("Connecting to %s ...", hostName.c_str());
@@ -967,6 +971,7 @@ public:
       std::unique_lock<std::mutex> lck(g_mutex);
       ++g_seq;
       g_conditionVariable.notify_all();
+      // ROS_INFO("notified");
 
       auto endIteration = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> elapsedSeconds = endIteration - startIteration;
