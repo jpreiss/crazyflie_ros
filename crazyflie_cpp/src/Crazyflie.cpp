@@ -322,6 +322,20 @@ void Crazyflie::requestParamToc()
       m_paramTocEntries.back().group = item.second.get<std::string>("group");
       m_paramTocEntries.back().name = item.second.get<std::string>("name");
     }
+
+    // Request values
+    startBatchRequest();
+    for (size_t i = 0; i < len; ++i) {
+      crtpParamReadRequest readRequest(i);
+      addRequest(readRequest, 1);
+    }
+    handleRequests();
+    for (size_t i = 0; i < len; ++i) {
+      auto val = getRequestResult<crtpParamValueResponse>(i);
+      ParamValue v;
+      std::memcpy(&v, &val->valueFloat, 4);
+      m_paramValues[i] = v;
+    }
   }
 }
 
