@@ -45,6 +45,7 @@
 #include <libobjecttracker/cloudlog.hpp>
 
 #include <fstream>
+#include <future>
 
 /*
 Threading
@@ -60,10 +61,6 @@ Threading
    * Service worker: Listens to CF-based service calls (such as upload trajectory) and executes
      them. Those can be potentially long, without interfering with the VICON update.
 */
-
-std::mutex g_mutex;
-std::condition_variable g_conditionVariable;
-uint32_t g_seq = 0;
 
 constexpr double pi() { return std::atan(1)*4; }
 
@@ -478,107 +475,101 @@ public:
 
   void runFast()
   {
-    uint32_t seq = 0;
-    std::unique_lock<std::mutex> lck(g_mutex);
-    while(ros::ok() && !m_isEmergency) {
-      g_conditionVariable.wait(lck, [seq]{return g_seq > seq;});
-      ++seq;
-      auto stamp = std::chrono::high_resolution_clock::now();
+    auto stamp = std::chrono::high_resolution_clock::now();
 
-      std::vector<stateExternalBringup> states;
-      if (m_useViconTracker) {
-        using namespace ViconDataStreamSDK::CPP;
+    std::vector<stateExternalBringup> states;
+    if (m_useViconTracker) {
+      using namespace ViconDataStreamSDK::CPP;
 
-        for (auto cf : m_cfs) {
-          std::string subjectName = cf->frame();
-          std::string segmentName = cf->frame();
+      for (auto cf : m_cfs) {
+        std::string subjectName = cf->frame();
+        std::string segmentName = cf->frame();
 
-          Output_GetSegmentGlobalTranslation translation = m_pClient->GetSegmentGlobalTranslation(subjectName, segmentName);
-          Output_GetSegmentGlobalRotationQuaternion quaternion = m_pClient->GetSegmentGlobalRotationQuaternion(subjectName, segmentName);
+        Output_GetSegmentGlobalTranslation translation = m_pClient->GetSegmentGlobalTranslation(subjectName, segmentName);
+        Output_GetSegmentGlobalRotationQuaternion quaternion = m_pClient->GetSegmentGlobalRotationQuaternion(subjectName, segmentName);
 
-          if (   translation.Result == Result::Success
-              && quaternion.Result == Result::Success
-              && !translation.Occluded
-              && !quaternion.Occluded) {
+        if (   translation.Result == Result::Success
+            && quaternion.Result == Result::Success
+            && !translation.Occluded
+            && !quaternion.Occluded) {
 
-            states.resize(states.size() + 1);
-            states.back().id = cf->id();
-            states.back().x = translation.Translation[0] / 1000.0;
-            states.back().y = translation.Translation[1] / 1000.0;
-            states.back().z = translation.Translation[2] / 1000.0;
-            states.back().q0 = quaternion.Rotation[0];
-            states.back().q1 = quaternion.Rotation[1];
-            states.back().q2 = quaternion.Rotation[2];
-            states.back().q3 = quaternion.Rotation[3];
+          states.resize(states.size() + 1);
+          states.back().id = cf->id();
+          states.back().x = translation.Translation[0] / 1000.0;
+          states.back().y = translation.Translation[1] / 1000.0;
+          states.back().z = translation.Translation[2] / 1000.0;
+          states.back().q0 = quaternion.Rotation[0];
+          states.back().q1 = quaternion.Rotation[1];
+          states.back().q2 = quaternion.Rotation[2];
+          states.back().q3 = quaternion.Rotation[3];
 
-            tf::Transform transform;
-            transform.setOrigin(tf::Vector3(
-              translation.Translation[0] / 1000.0,
-              translation.Translation[1] / 1000.0,
-              translation.Translation[2] / 1000.0));
-            tf::Quaternion q(
-              quaternion.Rotation[0],
-              quaternion.Rotation[1],
-              quaternion.Rotation[2],
-              quaternion.Rotation[3]);
-            transform.setRotation(q);
-            m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", cf->frame()));
-          } else {
-            ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
-          }
-        }
-      } else {
-        // run object tracker
-        {
-          auto start = std::chrono::high_resolution_clock::now();
-          m_tracker->update(m_pMarkers);
-          auto end = std::chrono::high_resolution_clock::now();
-          std::chrono::duration<double> elapsedSeconds = end-start;
-          // totalLatency += elapsedSeconds.count();
-          // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
-        }
-
-        for (size_t i = 0; i < m_cfs.size(); ++i) {
-          if (m_tracker->objects()[i].lastTransformationValid()) {
-
-            const Eigen::Affine3f& transform = m_tracker->objects()[i].transformation();
-            Eigen::Quaternionf q(transform.rotation());
-            const auto& translation = transform.translation();
-
-            states.resize(states.size() + 1);
-            states.back().id = m_cfs[i]->id();
-            states.back().x = translation.x();
-            states.back().y = translation.y();
-            states.back().z = translation.z();
-            states.back().q0 = q.x();
-            states.back().q1 = q.y();
-            states.back().q2 = q.z();
-            states.back().q3 = q.w();
-
-            tf::Transform tftransform;
-            Eigen::Affine3d transformd = transform.cast<double>();
-            tf::transformEigenToTF(transformd, tftransform);
-            // tftransform.setOrigin(tf::Vector3(translation.x(), translation.y(), translation.z()));
-            // tf::Quaternion tfq(q.x(), q.y(), q.z(), q.w());
-            m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", m_cfs[i]->frame()));
-
-          } else {
-            std::chrono::duration<double> elapsedSeconds = stamp - m_tracker->objects()[i].lastValidTime();
-            ROS_WARN("No updated pose for CF %s for %f s.",
-              m_cfs[i]->frame().c_str(),
-              elapsedSeconds.count());
-          }
+          tf::Transform transform;
+          transform.setOrigin(tf::Vector3(
+            translation.Translation[0] / 1000.0,
+            translation.Translation[1] / 1000.0,
+            translation.Translation[2] / 1000.0));
+          tf::Quaternion q(
+            quaternion.Rotation[0],
+            quaternion.Rotation[1],
+            quaternion.Rotation[2],
+            quaternion.Rotation[3]);
+          transform.setRotation(q);
+          m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", cf->frame()));
+        } else {
+          ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
         }
       }
-
+    } else {
+      // run object tracker
       {
         auto start = std::chrono::high_resolution_clock::now();
-        m_cfbc.sendPositionExternalBringup(states);
+        m_tracker->update(m_pMarkers);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsedSeconds = end-start;
         // totalLatency += elapsedSeconds.count();
-        // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
+        // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
       }
+
+      for (size_t i = 0; i < m_cfs.size(); ++i) {
+        if (m_tracker->objects()[i].lastTransformationValid()) {
+
+          const Eigen::Affine3f& transform = m_tracker->objects()[i].transformation();
+          Eigen::Quaternionf q(transform.rotation());
+          const auto& translation = transform.translation();
+
+          states.resize(states.size() + 1);
+          states.back().id = m_cfs[i]->id();
+          states.back().x = translation.x();
+          states.back().y = translation.y();
+          states.back().z = translation.z();
+          states.back().q0 = q.x();
+          states.back().q1 = q.y();
+          states.back().q2 = q.z();
+          states.back().q3 = q.w();
+
+          tf::Transform tftransform;
+          Eigen::Affine3d transformd = transform.cast<double>();
+          tf::transformEigenToTF(transformd, tftransform);
+          // tftransform.setOrigin(tf::Vector3(translation.x(), translation.y(), translation.z()));
+          // tf::Quaternion tfq(q.x(), q.y(), q.z(), q.w());
+          m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", m_cfs[i]->frame()));
+
+        } else {
+          std::chrono::duration<double> elapsedSeconds = stamp - m_tracker->objects()[i].lastValidTime();
+          ROS_WARN("No updated pose for CF %s for %f s.",
+            m_cfs[i]->frame().c_str(),
+            elapsedSeconds.count());
+        }
+      }
+    }
+
+    {
+      auto start = std::chrono::high_resolution_clock::now();
+      m_cfbc.sendPositionExternalBringup(states);
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> elapsedSeconds = end-start;
+      // totalLatency += elapsedSeconds.count();
+      // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
     }
   }
 
@@ -889,7 +880,7 @@ public:
           broadcastAddress,
           useViconTracker,
           logBlocks));
-      threads.push_back(std::thread(&CrazyflieGroup::runFast, m_groups.back()));
+      // threads.push_back(std::thread(&CrazyflieGroup::runFast, m_groups.back()));
       threads.push_back(std::thread(&CrazyflieGroup::runSlow, m_groups.back()));
       ++radio;
     }
@@ -980,13 +971,25 @@ public:
         }
       }
 
-      std::unique_lock<std::mutex> lck(g_mutex);
-      ++g_seq;
-      g_conditionVariable.notify_all();
-      // ROS_INFO("notified");
+      std::vector<std::future<void> > handles;
+      for (auto group : m_groups) {
+        auto handle = std::async(std::launch::async, &CrazyflieGroup::runFast, group);
+        handles.push_back(std::move(handle));
+      }
+
+      for (auto& handle : handles) {
+        handle.wait();
+      }
+
 
       auto endIteration = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> elapsedSeconds = endIteration - startIteration;
+      std::chrono::duration<double> elapsed = endIteration - startIteration;
+      double elapsedSeconds = elapsed.count();
+
+      // Warn if we needed too much time to execute everything
+      if (elapsedSeconds > 0.08) {
+        ROS_WARN("Latency too long! Is %f s.", elapsedSeconds);
+      }
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
 
       // m_fastQueue.callAvailable(ros::WallDuration(0));
