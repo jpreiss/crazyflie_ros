@@ -62,8 +62,11 @@ Threading
 */
 
 std::mutex g_mutex;
+std::mutex g_mutex2;
 std::condition_variable g_conditionVariable;
-uint32_t g_seq = 0;
+std::condition_variable g_conditionVariable2;
+uint32_t g_seq;
+uint32_t g_processed;
 
 constexpr double pi() { return std::atan(1)*4; }
 
@@ -479,9 +482,14 @@ public:
   void runFast()
   {
     uint32_t seq = 0;
-    std::unique_lock<std::mutex> lck(g_mutex);
     while(ros::ok() && !m_isEmergency) {
-      g_conditionVariable.wait(lck, [seq]{return g_seq > seq;});
+
+      // wait for new work
+      {
+        std::unique_lock<std::mutex> lk(g_mutex);
+        g_conditionVariable.wait(lk, [seq]{return g_seq > seq;});
+      }
+      // ROS_INFO("runFast");
       ++seq;
       auto stamp = std::chrono::high_resolution_clock::now();
 
@@ -579,6 +587,12 @@ public:
         // totalLatency += elapsedSeconds.count();
         // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
       }
+
+      {
+        std::unique_lock<std::mutex> lk(g_mutex2);
+        ++g_processed;
+      }
+      g_conditionVariable2.notify_one();
     }
   }
 
@@ -873,6 +887,7 @@ public:
     Client client;
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
+    g_seq = 0; // prevent threads from starting
 
     // Create all groups and run their threads
     std::vector<std::thread> threads;
@@ -942,7 +957,10 @@ public:
       double totalLatency = 0;
 
       // Get the latency
-      // totalLatency += client.GetLatencyTotal().Total;
+      float viconLatency = client.GetLatencyTotal().Total;
+      if (viconLatency > 0.02) {
+        ROS_WARN("VICON Latency high: %f s.", viconLatency);
+      }
 
       // size_t latencyCount = client.GetLatencySampleCount().Count;
       // for(size_t i = 0; i < latencyCount; ++i) {
@@ -980,13 +998,29 @@ public:
         }
       }
 
-      std::unique_lock<std::mutex> lck(g_mutex);
-      ++g_seq;
+      // send data to worker threads
+      {
+        std::unique_lock<std::mutex> lk(g_mutex);
+        g_processed = 0;
+        ++g_seq;
+      }
+      // ROS_INFO("notify_all");
       g_conditionVariable.notify_all();
-      // ROS_INFO("notified");
+
+      // wait for worker threads
+      uint32_t numGroups = m_groups.size();
+      {
+        std::unique_lock<std::mutex> lk(g_mutex2);
+        g_conditionVariable2.wait(lk, [numGroups]{return g_processed == numGroups;});
+      }
 
       auto endIteration = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> elapsedSeconds = endIteration - startIteration;
+      std::chrono::duration<double> elapsed = endIteration - startIteration;
+      double elapsedSeconds = elapsed.count();
+      if (elapsedSeconds > 0.005) {
+        ROS_WARN("Latency too high! Is %f s.", elapsedSeconds);
+      }
+
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
 
       // m_fastQueue.callAvailable(ros::WallDuration(0));
