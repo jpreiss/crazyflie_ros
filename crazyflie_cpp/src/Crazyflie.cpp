@@ -505,7 +505,7 @@ void Crazyflie::trajectoryAdd(
   request.data.values[2] = poly_yaw[7];
   addRequest(request, 3);
 
-  handleRequests();
+  handleRequests(5.0, 0.05, 10);
 
   ++m_lastTrajectoryId;
 }
@@ -776,7 +776,8 @@ void Crazyflie::addRequest(
 
 void Crazyflie::handleRequests(
   float baseTime,
-  float timePerRequest)
+  float timePerRequest,
+  int additionalSleep)
 {
   auto start = std::chrono::system_clock::now();
   Crazyradio::Ack ack;
@@ -786,8 +787,9 @@ void Crazyflie::handleRequests(
   float timeout = baseTime + timePerRequest * m_batchRequests.size();
 
   while (true) {
-     // FIXME: add as parameter
-    // std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    if (additionalSleep) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(additionalSleep));
+    }
     if (!sendPing) {
       for (const auto& request : m_batchRequests) {
         if (!request.finished) {

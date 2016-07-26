@@ -483,6 +483,7 @@ public:
     while(ros::ok() && !m_isEmergency) {
       g_conditionVariable.wait(lck, [seq]{return g_seq > seq;});
       ++seq;
+      auto stamp = std::chrono::high_resolution_clock::now();
 
       std::vector<stateExternalBringup> states;
       if (m_useViconTracker) {
@@ -537,8 +538,7 @@ public:
           // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
         }
 
-        size_t i = 0;
-        for (auto cf : m_cfs) {
+        for (size_t i = 0; i < m_cfs.size(); ++i) {
           if (m_tracker->objects()[i].lastTransformationValid()) {
 
             const Eigen::Affine3f& transform = m_tracker->objects()[i].transformation();
@@ -546,7 +546,7 @@ public:
             const auto& translation = transform.translation();
 
             states.resize(states.size() + 1);
-            states.back().id = cf->id();
+            states.back().id = m_cfs[i]->id();
             states.back().x = translation.x();
             states.back().y = translation.y();
             states.back().z = translation.z();
@@ -555,18 +555,19 @@ public:
             states.back().q2 = q.z();
             states.back().q3 = q.w();
 
-
             tf::Transform tftransform;
             Eigen::Affine3d transformd = transform.cast<double>();
             tf::transformEigenToTF(transformd, tftransform);
             // tftransform.setOrigin(tf::Vector3(translation.x(), translation.y(), translation.z()));
             // tf::Quaternion tfq(q.x(), q.y(), q.z(), q.w());
-            m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", cf->frame()));
+            m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", m_cfs[i]->frame()));
 
           } else {
-            ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
+            std::chrono::duration<double> elapsedSeconds = stamp - m_tracker->objects()[i].lastValidTime();
+            ROS_WARN("No updated pose for CF %s for %f s.",
+              m_cfs[i]->frame().c_str(),
+              elapsedSeconds.count());
           }
-          ++i;
         }
       }
 
@@ -585,7 +586,7 @@ public:
   {
     while(ros::ok() && !m_isEmergency) {
       // if (m_cfs.size() == 1) {
-      //   m_cfs[0]->sendPing();
+        // m_cfs[0]->sendPing();
       // }
       m_slowQueue.callAvailable(ros::WallDuration(0));
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -655,6 +656,7 @@ private:
     ROS_ASSERT(crazyflies.getType() == XmlRpc::XmlRpcValue::TypeArray);
 
     objects.clear();
+    m_cfs.clear();
     for (int32_t i = 0; i < crazyflies.size(); ++i) {
       ROS_ASSERT(crazyflies[i].getType() == XmlRpc::XmlRpcValue::TypeStruct);
       XmlRpc::XmlRpcValue crazyflie = crazyflies[i];
@@ -940,7 +942,7 @@ public:
       double totalLatency = 0;
 
       // Get the latency
-      totalLatency += client.GetLatencyTotal().Total;
+      // totalLatency += client.GetLatencyTotal().Total;
 
       // size_t latencyCount = client.GetLatencySampleCount().Count;
       // for(size_t i = 0; i < latencyCount; ++i) {
