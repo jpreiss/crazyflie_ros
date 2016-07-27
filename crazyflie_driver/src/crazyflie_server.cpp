@@ -121,6 +121,13 @@ public:
     // m_subscribeJoy = n.subscribe("/joy", 1, &CrazyflieROS::joyChanged, this);
   }
 
+  ~CrazyflieROS()
+  {
+    m_logBlocks.clear();
+    m_logBlocksGeneric.clear();
+    m_cf.trySysOff();
+  }
+
   const std::string& frame() const {
     return m_frame;
   }
@@ -309,6 +316,8 @@ public:
     ros::CallbackQueue& queue)
   {
     // m_cf.reboot();
+    m_cf.syson();
+    // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     auto start = std::chrono::system_clock::now();
 

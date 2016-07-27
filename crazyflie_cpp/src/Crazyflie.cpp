@@ -164,6 +164,16 @@ void Crazyflie::sysoff()
   sendPacketOrTimeout(shutdown, sizeof(shutdown));
 }
 
+void Crazyflie::trySysOff()
+{
+  const uint8_t shutdown[] = {0xFF, 0xFE, 0x02};
+  for (size_t i = 0; i < 10; ++i) {
+    if (sendPacket(shutdown, sizeof(shutdown))) {
+      break;
+    }
+  }
+}
+
 void Crazyflie::alloff()
 {
   const uint8_t shutdown[] = {0xFF, 0xFE, 0x01};

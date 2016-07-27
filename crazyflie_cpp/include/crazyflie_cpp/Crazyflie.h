@@ -99,6 +99,7 @@ public:
   void reboot();
   void rebootToBootloader();
   void sysoff();
+  void trySysOff();
   void alloff();
   void syson();
 
@@ -236,7 +237,7 @@ private:
 
   void handleRequests(
     float baseTime = 2.0,
-    float timePerRequest = 0.05,
+    float timePerRequest = 0.2,
     int additionalSleep = 0);
 
   void handleBatchAck(
