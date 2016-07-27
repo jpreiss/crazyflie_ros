@@ -48,6 +48,7 @@ add_service_files(
   Hover.srv
   Takeoff.srv
   Land.srv
+  StartCannedTrajectory.srv
 )
 
 add_message_files(

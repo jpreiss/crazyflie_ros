@@ -210,6 +210,11 @@ private:
     const uint8_t* data,
     uint32_t length);
 
+ void sendPacketOrTimeout(
+   const uint8_t* data,
+   uint32_t length,
+   float timeout = 1.0);
+
   void handleAck(
     const Crazyradio::Ack& result);
 
@@ -604,6 +609,10 @@ public:
 
   void ellipse();
   void goHome();
+
+  void startCannedTrajectory(
+    uint16_t trajectory, // one of enum trajectory_type
+    float timescale);
 
   void sendPositionExternalBringup(
     const std::vector<stateExternalBringup>& data);

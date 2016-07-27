@@ -142,38 +142,38 @@ void Crazyflie::sendPing()
 void Crazyflie::reboot()
 {
   const uint8_t reboot_init[] = {0xFF, 0xFE, 0xFF};
-  while(!sendPacket(reboot_init, sizeof(reboot_init))) {}
+  sendPacketOrTimeout(reboot_init, sizeof(reboot_init));
 
   const uint8_t reboot_to_firmware[] = {0xFF, 0xFE, 0xF0, 0x01};
-  while(!sendPacket(reboot_to_firmware, sizeof(reboot_to_firmware))) {}
+  sendPacketOrTimeout(reboot_to_firmware, sizeof(reboot_to_firmware));
 }
 
 void Crazyflie::rebootToBootloader()
 {
   const uint8_t reboot_init[] = {0xFF, 0xFE, 0xFF};
-  while(!sendPacket(reboot_init, sizeof(reboot_init))) {}
+  sendPacketOrTimeout(reboot_init, sizeof(reboot_init));
 
   const uint8_t reboot_to_bootloader[] = {0xFF, 0xFE, 0xF0, 0x00};
-  while(!sendPacket(reboot_to_bootloader, sizeof(reboot_to_bootloader))) {}
+  sendPacketOrTimeout(reboot_to_bootloader, sizeof(reboot_to_bootloader));
 }
 
 // needs custom nrf firmware
 void Crazyflie::sysoff()
 {
   const uint8_t shutdown[] = {0xFF, 0xFE, 0x02};
-  while(!sendPacket(shutdown, sizeof(shutdown))) {}
+  sendPacketOrTimeout(shutdown, sizeof(shutdown));
 }
 
 void Crazyflie::alloff()
 {
   const uint8_t shutdown[] = {0xFF, 0xFE, 0x01};
-  while(!sendPacket(shutdown, sizeof(shutdown))) {}
+  sendPacketOrTimeout(shutdown, sizeof(shutdown));
 }
 
 void Crazyflie::syson()
 {
   const uint8_t shutdown[] = {0xFF, 0xFE, 0x03};
-  while(!sendPacket(shutdown, sizeof(shutdown))) {}
+  sendPacketOrTimeout(shutdown, sizeof(shutdown));
 }
 
 void Crazyflie::requestLogToc()
@@ -505,7 +505,7 @@ void Crazyflie::trajectoryAdd(
   request.data.values[2] = poly_yaw[7];
   addRequest(request, 3);
 
-  handleRequests(5.0, 0.05, 10);
+  handleRequests(5.0, 0.05, 17);
 
   ++m_lastTrajectoryId;
 }
@@ -518,9 +518,10 @@ void Crazyflie::trajectoryHover(
     float duration)
 {
   crtpTrajectoryHoverRequest request(x, y, z, yaw, duration);
-  startBatchRequest();
-  addRequest(request, 2);
-  handleRequests();
+  sendPacketOrTimeout(reinterpret_cast<const uint8_t*>(&request), sizeof(request));
+  // startBatchRequest();
+  // addRequest(request, 2);
+  // handleRequests();
 }
 
 // void Crazyflie::trajectoryStart()
@@ -610,6 +611,21 @@ bool Crazyflie::sendPacket(
   Crazyradio::Ack ack;
   sendPacket(data, length, ack);
   return ack.ack;
+}
+
+ void Crazyflie::sendPacketOrTimeout(
+   const uint8_t* data,
+   uint32_t length,
+   float timeout)
+{
+  auto start = std::chrono::system_clock::now();
+  while (!sendPacket(data, length)) {
+    auto end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsedSeconds = end-start;
+    if (elapsedSeconds.count() > timeout) {
+      throw std::runtime_error("timeout");
+    }
+  }
 }
 
 void Crazyflie::sendPacket(
@@ -988,6 +1004,14 @@ void CrazyflieBroadcaster::ellipse()
 void CrazyflieBroadcaster::goHome()
 {
   crtpTrajectoryGoHomeRequest request;
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}
+
+void CrazyflieBroadcaster::startCannedTrajectory(
+  uint16_t trajectory, // one of enum trajectory_type
+  float timescale)
+{
+  crtpTrajectoryStartCannedRequest request(trajectory, timescale);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 

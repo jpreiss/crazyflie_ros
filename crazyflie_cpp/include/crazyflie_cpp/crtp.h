@@ -616,6 +616,24 @@ struct crtpTrajectorySetEllipseRequest
 } __attribute__((packed));
 CHECKSIZE(crtpTrajectorySetEllipseRequest)
 
+struct crtpTrajectoryStartCannedRequest
+{
+  crtpTrajectoryStartCannedRequest(
+    uint16_t trajectory,
+    float timescale)
+    : header(14, 1)
+    , command(COMMAND_START_CANNED_TRAJECTORY)
+    {
+      data.trajectory = trajectory;
+      data.timescale = timescale;
+    }
+
+    const crtp header;
+    const uint8_t command;
+    struct data_start_canned_trajectory data;
+} __attribute__((packed));
+CHECKSIZE(crtpTrajectoryStartCannedRequest)
+
 // struct crtpTrajectoryStateRequest
 // {
 //   crtpTrajectoryStateRequest(uint8_t state)

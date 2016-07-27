@@ -8,6 +8,7 @@
 #include "crazyflie_driver/GenericLogData.h"
 #include "crazyflie_driver/UpdateParams.h"
 #include "crazyflie_driver/UploadTrajectory.h"
+#include "crazyflie_driver/StartCannedTrajectory.h"
 #undef major
 #undef minor
 #include "crazyflie_driver/SetEllipse.h"
@@ -45,6 +46,7 @@
 #include <libobjecttracker/cloudlog.hpp>
 
 #include <fstream>
+#include <future>
 
 /*
 Threading
@@ -60,13 +62,6 @@ Threading
    * Service worker: Listens to CF-based service calls (such as upload trajectory) and executes
      them. Those can be potentially long, without interfering with the VICON update.
 */
-
-std::mutex g_mutex;
-std::mutex g_mutex2;
-std::condition_variable g_conditionVariable;
-std::condition_variable g_conditionVariable2;
-uint32_t g_seq;
-uint32_t g_processed;
 
 constexpr double pi() { return std::atan(1)*4; }
 
@@ -481,127 +476,110 @@ public:
 
   void runFast()
   {
-    uint32_t seq = 0;
-    while(ros::ok() && !m_isEmergency) {
+    auto stamp = std::chrono::high_resolution_clock::now();
 
-      // wait for new work
-      {
-        std::unique_lock<std::mutex> lk(g_mutex);
-        g_conditionVariable.wait(lk, [seq]{return g_seq > seq;});
-      }
-      // ROS_INFO("runFast");
-      ++seq;
-      auto stamp = std::chrono::high_resolution_clock::now();
+    std::vector<stateExternalBringup> states;
+    if (m_useViconTracker) {
+      using namespace ViconDataStreamSDK::CPP;
 
-      std::vector<stateExternalBringup> states;
-      if (m_useViconTracker) {
-        using namespace ViconDataStreamSDK::CPP;
+      for (auto cf : m_cfs) {
+        std::string subjectName = cf->frame();
+        std::string segmentName = cf->frame();
 
-        for (auto cf : m_cfs) {
-          std::string subjectName = cf->frame();
-          std::string segmentName = cf->frame();
+        Output_GetSegmentGlobalTranslation translation = m_pClient->GetSegmentGlobalTranslation(subjectName, segmentName);
+        Output_GetSegmentGlobalRotationQuaternion quaternion = m_pClient->GetSegmentGlobalRotationQuaternion(subjectName, segmentName);
 
-          Output_GetSegmentGlobalTranslation translation = m_pClient->GetSegmentGlobalTranslation(subjectName, segmentName);
-          Output_GetSegmentGlobalRotationQuaternion quaternion = m_pClient->GetSegmentGlobalRotationQuaternion(subjectName, segmentName);
+        if (   translation.Result == Result::Success
+            && quaternion.Result == Result::Success
+            && !translation.Occluded
+            && !quaternion.Occluded) {
 
-          if (   translation.Result == Result::Success
-              && quaternion.Result == Result::Success
-              && !translation.Occluded
-              && !quaternion.Occluded) {
+          states.resize(states.size() + 1);
+          states.back().id = cf->id();
+          states.back().x = translation.Translation[0] / 1000.0;
+          states.back().y = translation.Translation[1] / 1000.0;
+          states.back().z = translation.Translation[2] / 1000.0;
+          states.back().q0 = quaternion.Rotation[0];
+          states.back().q1 = quaternion.Rotation[1];
+          states.back().q2 = quaternion.Rotation[2];
+          states.back().q3 = quaternion.Rotation[3];
 
-            states.resize(states.size() + 1);
-            states.back().id = cf->id();
-            states.back().x = translation.Translation[0] / 1000.0;
-            states.back().y = translation.Translation[1] / 1000.0;
-            states.back().z = translation.Translation[2] / 1000.0;
-            states.back().q0 = quaternion.Rotation[0];
-            states.back().q1 = quaternion.Rotation[1];
-            states.back().q2 = quaternion.Rotation[2];
-            states.back().q3 = quaternion.Rotation[3];
-
-            tf::Transform transform;
-            transform.setOrigin(tf::Vector3(
-              translation.Translation[0] / 1000.0,
-              translation.Translation[1] / 1000.0,
-              translation.Translation[2] / 1000.0));
-            tf::Quaternion q(
-              quaternion.Rotation[0],
-              quaternion.Rotation[1],
-              quaternion.Rotation[2],
-              quaternion.Rotation[3]);
-            transform.setRotation(q);
-            m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", cf->frame()));
-          } else {
-            ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
-          }
-        }
-      } else {
-        // run object tracker
-        {
-          auto start = std::chrono::high_resolution_clock::now();
-          m_tracker->update(m_pMarkers);
-          auto end = std::chrono::high_resolution_clock::now();
-          std::chrono::duration<double> elapsedSeconds = end-start;
-          // totalLatency += elapsedSeconds.count();
-          // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
-        }
-
-        for (size_t i = 0; i < m_cfs.size(); ++i) {
-          if (m_tracker->objects()[i].lastTransformationValid()) {
-
-            const Eigen::Affine3f& transform = m_tracker->objects()[i].transformation();
-            Eigen::Quaternionf q(transform.rotation());
-            const auto& translation = transform.translation();
-
-            states.resize(states.size() + 1);
-            states.back().id = m_cfs[i]->id();
-            states.back().x = translation.x();
-            states.back().y = translation.y();
-            states.back().z = translation.z();
-            states.back().q0 = q.x();
-            states.back().q1 = q.y();
-            states.back().q2 = q.z();
-            states.back().q3 = q.w();
-
-            tf::Transform tftransform;
-            Eigen::Affine3d transformd = transform.cast<double>();
-            tf::transformEigenToTF(transformd, tftransform);
-            // tftransform.setOrigin(tf::Vector3(translation.x(), translation.y(), translation.z()));
-            // tf::Quaternion tfq(q.x(), q.y(), q.z(), q.w());
-            m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", m_cfs[i]->frame()));
-
-          } else {
-            std::chrono::duration<double> elapsedSeconds = stamp - m_tracker->objects()[i].lastValidTime();
-            ROS_WARN("No updated pose for CF %s for %f s.",
-              m_cfs[i]->frame().c_str(),
-              elapsedSeconds.count());
-          }
+          tf::Transform transform;
+          transform.setOrigin(tf::Vector3(
+            translation.Translation[0] / 1000.0,
+            translation.Translation[1] / 1000.0,
+            translation.Translation[2] / 1000.0));
+          tf::Quaternion q(
+            quaternion.Rotation[0],
+            quaternion.Rotation[1],
+            quaternion.Rotation[2],
+            quaternion.Rotation[3]);
+          transform.setRotation(q);
+          m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", cf->frame()));
+        } else {
+          ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
         }
       }
-
+    } else {
+      // run object tracker
       {
         auto start = std::chrono::high_resolution_clock::now();
-        m_cfbc.sendPositionExternalBringup(states);
+        m_tracker->update(m_pMarkers);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsedSeconds = end-start;
         // totalLatency += elapsedSeconds.count();
-        // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
+        // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
       }
 
-      {
-        std::unique_lock<std::mutex> lk(g_mutex2);
-        ++g_processed;
+      for (size_t i = 0; i < m_cfs.size(); ++i) {
+        if (m_tracker->objects()[i].lastTransformationValid()) {
+
+          const Eigen::Affine3f& transform = m_tracker->objects()[i].transformation();
+          Eigen::Quaternionf q(transform.rotation());
+          const auto& translation = transform.translation();
+
+          states.resize(states.size() + 1);
+          states.back().id = m_cfs[i]->id();
+          states.back().x = translation.x();
+          states.back().y = translation.y();
+          states.back().z = translation.z();
+          states.back().q0 = q.x();
+          states.back().q1 = q.y();
+          states.back().q2 = q.z();
+          states.back().q3 = q.w();
+
+          tf::Transform tftransform;
+          Eigen::Affine3d transformd = transform.cast<double>();
+          tf::transformEigenToTF(transformd, tftransform);
+          // tftransform.setOrigin(tf::Vector3(translation.x(), translation.y(), translation.z()));
+          // tf::Quaternion tfq(q.x(), q.y(), q.z(), q.w());
+          m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", m_cfs[i]->frame()));
+
+        } else {
+          std::chrono::duration<double> elapsedSeconds = stamp - m_tracker->objects()[i].lastValidTime();
+          ROS_WARN("No updated pose for CF %s for %f s.",
+            m_cfs[i]->frame().c_str(),
+            elapsedSeconds.count());
+        }
       }
-      g_conditionVariable2.notify_one();
+    }
+
+    {
+      auto start = std::chrono::high_resolution_clock::now();
+      m_cfbc.sendPositionExternalBringup(states);
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> elapsedSeconds = end-start;
+      // totalLatency += elapsedSeconds.count();
+      // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
     }
   }
 
   void runSlow()
   {
     while(ros::ok() && !m_isEmergency) {
-      // if (m_cfs.size() == 1) {
-        // m_cfs[0]->sendPing();
-      // }
+      if (m_cfs.size() == 1) {
+        m_cfs[0]->sendPing();
+      }
       m_slowQueue.callAvailable(ros::WallDuration(0));
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -654,6 +632,13 @@ public:
       m_cfbc.goHome();
       // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     // }
+  }
+
+  void startCannedTrajectory(
+    uint16_t trajectory,
+    float timescale)
+  {
+      m_cfbc.startCannedTrajectory(trajectory, timescale);
   }
 
 private:
@@ -787,6 +772,7 @@ public:
     , m_serviceLand()
     , m_serviceStartEllipse()
     , m_serviceGoHome()
+    , m_serviceStartCannedTrajectory()
   {
     ros::NodeHandle nh;
     nh.setCallbackQueue(&m_queue);
@@ -797,6 +783,7 @@ public:
     m_serviceLand = nh.advertiseService("land", &CrazyflieServer::land, this);
     m_serviceStartEllipse = nh.advertiseService("start_ellipse", &CrazyflieServer::startEllipse, this);
     m_serviceGoHome = nh.advertiseService("go_home", &CrazyflieServer::goHome, this);
+    m_serviceStartCannedTrajectory = nh.advertiseService("start_canned_trajectory", &CrazyflieServer::startCannedTrajectory, this);
 
     m_pubPointCloud = nh.advertise<sensor_msgs::PointCloud>("pointCloud", 1);
   }
@@ -887,7 +874,6 @@ public:
     Client client;
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
-    g_seq = 0; // prevent threads from starting
 
     // Create all groups and run their threads
     std::vector<std::thread> threads;
@@ -904,7 +890,7 @@ public:
           broadcastAddress,
           useViconTracker,
           logBlocks));
-      threads.push_back(std::thread(&CrazyflieGroup::runFast, m_groups.back()));
+      // threads.push_back(std::thread(&CrazyflieGroup::runFast, m_groups.back()));
       threads.push_back(std::thread(&CrazyflieGroup::runSlow, m_groups.back()));
       ++radio;
     }
@@ -958,7 +944,7 @@ public:
 
       // Get the latency
       float viconLatency = client.GetLatencyTotal().Total;
-      if (viconLatency > 0.02) {
+      if (viconLatency > 0.025) {
         ROS_WARN("VICON Latency high: %f s.", viconLatency);
       }
 
@@ -998,20 +984,14 @@ public:
         }
       }
 
-      // send data to worker threads
-      {
-        std::unique_lock<std::mutex> lk(g_mutex);
-        g_processed = 0;
-        ++g_seq;
+      std::vector<std::future<void> > handles;
+      for (auto group : m_groups) {
+        auto handle = std::async(std::launch::async, &CrazyflieGroup::runFast, group);
+        handles.push_back(std::move(handle));
       }
-      // ROS_INFO("notify_all");
-      g_conditionVariable.notify_all();
 
-      // wait for worker threads
-      uint32_t numGroups = m_groups.size();
-      {
-        std::unique_lock<std::mutex> lk(g_mutex2);
-        g_conditionVariable2.wait(lk, [numGroups]{return g_processed == numGroups;});
+      for (auto& handle : handles) {
+        handle.wait();
       }
 
       auto endIteration = std::chrono::high_resolution_clock::now();
@@ -1142,6 +1122,22 @@ private:
     return true;
   }
 
+  bool startCannedTrajectory(
+    crazyflie_driver::StartCannedTrajectory::Request& req,
+    crazyflie_driver::StartCannedTrajectory::Response& res)
+  {
+    ROS_INFO("StartCannedTrajectory!");
+
+    for (size_t i = 0; i < 10; ++i) {
+      for (auto& group : m_groups) {
+        group->startCannedTrajectory(req.trajectory, req.timescale);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    return true;
+  }
+
 //
   void readMarkerConfigurations(
     std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations)
@@ -1221,6 +1217,7 @@ private:
   ros::ServiceServer m_serviceLand;
   ros::ServiceServer m_serviceStartEllipse;
   ros::ServiceServer m_serviceGoHome;
+  ros::ServiceServer m_serviceStartCannedTrajectory;
 
   ros::Publisher m_pubPointCloud;
   // tf::TransformBroadcaster m_br;
