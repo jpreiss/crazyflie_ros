@@ -198,7 +198,7 @@ float Crazyflie::vbat()
 {
   const uint8_t shutdown[] = {0xFF, 0xFE, 0x04};
   startBatchRequest();
-  addRequest(shutdown, 3);
+  addRequest(shutdown, 2);
   handleRequests();
   return getRequestResult<nrf51vbatResponse>(0)->vbat;
 }
@@ -901,7 +901,7 @@ void Crazyflie::handleBatchAck(
 {
   if (ack.ack) {
     for (auto& request : m_batchRequests) {
-      if (crtp(ack.data[0]) == crtp(request.request[0])
+      if ((crtp(ack.data[0]) == crtp(request.request[0]) || ack.data[0] == request.request[0])
           && memcmp(&ack.data[1], &request.request[1], request.numBytesToMatch) == 0
           && !request.finished) {
         request.ack = ack;
@@ -911,6 +911,7 @@ void Crazyflie::handleBatchAck(
         return;
       }
     }
+    // std::cout << (int)ack.data[0] << "," << (int)ack.data[1] << "," << (int)ack.data[2] << std::endl;
     // handle generic ack
     // handleAck(ack);
     // crtp c(ack.data[0]);

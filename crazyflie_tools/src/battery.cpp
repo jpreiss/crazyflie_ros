@@ -53,24 +53,24 @@ int main(int argc, char **argv)
   try
   {
     Crazyflie cf(uri);
-    // std::cout << cf.vbat() << std::endl;
-    cf.logReset();
-    cf.requestLogToc();
+    std::cout << cf.vbat() << std::endl;
+    // cf.logReset();
+    // cf.requestLogToc();
 
-    std::unique_ptr<LogBlock<struct log> > logBlock;
-    std::function<void(uint32_t, struct log*)> cb = std::bind(&onLogData, std::placeholders::_1, std::placeholders::_2);
+    // std::unique_ptr<LogBlock<struct log> > logBlock;
+    // std::function<void(uint32_t, struct log*)> cb = std::bind(&onLogData, std::placeholders::_1, std::placeholders::_2);
 
-    logBlock.reset(new LogBlock<struct log>(
-      &cf,{
-        {"pm", "vbat"},
-        // {"pm", "chargeCurrent"}
-      }, cb));
-    logBlock->start(10); // 100ms
+    // logBlock.reset(new LogBlock<struct log>(
+    //   &cf,{
+    //     {"pm", "vbat"},
+    //     // {"pm", "chargeCurrent"}
+    //   }, cb));
+    // logBlock->start(10); // 100ms
 
-    while (!g_done) {
-      cf.sendPing();
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+    // while (!g_done) {
+    //   cf.sendPing();
+    //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // }
 
     return 0;
   }
