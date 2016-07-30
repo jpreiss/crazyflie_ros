@@ -186,6 +186,29 @@ void Crazyflie::syson()
   sendPacketOrTimeout(shutdown, sizeof(shutdown));
 }
 
+struct nrf51vbatResponse
+{
+  uint8_t dummy1;
+  uint8_t dummy2;
+  uint8_t dummy3;
+  float vbat;
+} __attribute__((packed));
+
+float Crazyflie::vbat()
+{
+  const uint8_t shutdown[] = {0xFF, 0xFE, 0x04};
+  startBatchRequest();
+  addRequest(shutdown, 3);
+  handleRequests();
+  return getRequestResult<nrf51vbatResponse>(0)->vbat;
+}
+
+void Crazyflie::setChannel(uint8_t channel)
+{
+  const uint8_t setChannel[] = {0xFF, 0x03, 0x01, channel};
+  sendPacketOrTimeout(setChannel, sizeof(setChannel));
+}
+
 void Crazyflie::requestLogToc()
 {
   // Find the number of log variables in TOC
@@ -240,7 +263,7 @@ void Crazyflie::requestLogToc()
       write_json(output, root);
     }
   } else {
-    std::cout << "Found variables in cache." << std::endl;
+    // std::cout << "Found variables in cache." << std::endl;
 
     pt::ptree root;
     pt::read_json(fileName, root);
@@ -319,7 +342,7 @@ void Crazyflie::requestParamToc()
       write_json(output, root);
     }
   } else {
-    std::cout << "Found variables in cache." << std::endl;
+    // std::cout << "Found variables in cache." << std::endl;
 
     pt::ptree root;
     pt::read_json(fileName, root);
@@ -349,9 +372,14 @@ void Crazyflie::requestParamToc()
   }
 }
 
-void Crazyflie::setParam(uint8_t id, const ParamValue& value) {
-
+void Crazyflie::startSetParamRequest()
+{
   startBatchRequest();
+}
+
+void Crazyflie::addSetParam(uint8_t id, const ParamValue& value) {
+
+  // startBatchRequest();
   bool found = false;
   for (auto&& entry : m_paramTocEntries) {
     if (entry.id == id) {
@@ -408,10 +436,23 @@ void Crazyflie::setParam(uint8_t id, const ParamValue& value) {
     sstr << "Could not find parameter with id " << id;
     throw std::runtime_error(sstr.str());
   }
-  handleRequests();
+  // handleRequests();
 
   m_paramValues[id] = value;
 }
+
+void Crazyflie::setRequestedParams()
+{
+  handleRequests();
+}
+
+void Crazyflie::setParam(uint8_t id, const ParamValue& value) {
+  startBatchRequest();
+  addSetParam(id, value);
+  setRequestedParams();
+}
+
+
 
 void Crazyflie::trajectoryReset()
 {
@@ -690,7 +731,7 @@ void Crazyflie::handleAck(
   if (crtpConsoleResponse::match(result)) {
     if (result.size > 0) {
       crtpConsoleResponse* r = (crtpConsoleResponse*)result.data;
-      std::cout << r->text << std::endl;
+      // std::cout << r->text << std::endl;
     }
     // ROS_INFO("Console: %s", r->text);
   }
@@ -871,7 +912,7 @@ void Crazyflie::handleBatchAck(
       }
     }
     // handle generic ack
-    handleAck(ack);
+    // handleAck(ack);
     // crtp c(ack.data[0]);
     //std::cout << "didnt handle ack " << (int) c.port << " " << (int) c.channel << " " << (int) ack.data[1] << " " << (int) ack.data[2] << std::endl;
     // TODO: generic handle ack here?

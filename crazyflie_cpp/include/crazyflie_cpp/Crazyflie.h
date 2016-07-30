@@ -102,6 +102,9 @@ public:
   void trySysOff();
   void alloff();
   void syson();
+  float vbat();
+
+  void setChannel(uint8_t channel);
 
   void requestLogToc();
 
@@ -127,6 +130,18 @@ public:
     memcpy(&v, &value, sizeof(value));
     setParam(id, v);
   }
+
+  void startSetParamRequest();
+
+  template<class T>
+  void addSetParam(uint8_t id, const T& value) {
+    ParamValue v;
+    memcpy(&v, &value, sizeof(value));
+    addSetParam(id, v);
+  }
+
+  void setRequestedParams();
+
 
   template<class T>
   T getParam(uint8_t id) const {
@@ -298,6 +313,9 @@ private:
     uint8_t id);
 
   void setParam(uint8_t id, const ParamValue& value);
+  void addSetParam(uint8_t id, const ParamValue& value);
+
+
   const ParamValue& getParam(uint8_t id) const {
     return m_paramValues.at(id);
   }

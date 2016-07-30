@@ -1,28 +1,14 @@
 #include <iostream>
-#include <chrono>
-#include <thread>
 
 #include <boost/program_options.hpp>
 #include <crazyflie_cpp/Crazyflie.h>
-
-struct log {
-  float pm_vbat;
-  // float chargeCurrent;
-} __attribute__((packed));
-
-volatile bool g_done = false;
-
-void onLogData(uint32_t time_in_ms, struct log* data)
-{
-  std::cout << data->pm_vbat << std::endl;
-  g_done = true;
-}
 
 int main(int argc, char **argv)
 {
 
   std::string uri;
   std::string defaultUri("radio://0/80/2M/E7E7E7E7E7");
+  int channel;
 
   namespace po = boost::program_options;
 
@@ -30,6 +16,7 @@ int main(int argc, char **argv)
   desc.add_options()
     ("help", "produce help message")
     ("uri", po::value<std::string>(&uri)->default_value(defaultUri), "unique ressource identifier")
+    ("channel", po::value<int>(&channel)->required(), "New Channel")
   ;
 
   try
@@ -53,24 +40,7 @@ int main(int argc, char **argv)
   try
   {
     Crazyflie cf(uri);
-    // std::cout << cf.vbat() << std::endl;
-    cf.logReset();
-    cf.requestLogToc();
-
-    std::unique_ptr<LogBlock<struct log> > logBlock;
-    std::function<void(uint32_t, struct log*)> cb = std::bind(&onLogData, std::placeholders::_1, std::placeholders::_2);
-
-    logBlock.reset(new LogBlock<struct log>(
-      &cf,{
-        {"pm", "vbat"},
-        // {"pm", "chargeCurrent"}
-      }, cb));
-    logBlock->start(10); // 100ms
-
-    while (!g_done) {
-      cf.sendPing();
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+    cf.setChannel(channel);
 
     return 0;
   }

@@ -99,6 +99,15 @@ target_link_libraries(battery
   ${Boost_LIBRARIES}
 )
 
+### setChannel
+
+add_executable(setChannel
+  src/setChannel.cpp
+)
+target_link_libraries(setChannel
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
 
 #############
 ## Install ##

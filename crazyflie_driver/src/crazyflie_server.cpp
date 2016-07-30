@@ -87,6 +87,7 @@ public:
     const std::string& frame,
     const std::string& worldFrame,
     bool enable_parameters,
+    bool enable_logging,
     int id,
     const std::vector<crazyflie_driver::LogBlock>& log_blocks,
     ros::CallbackQueue& queue)
@@ -95,6 +96,7 @@ public:
     , m_frame(frame)
     , m_worldFrame(worldFrame)
     , m_enableParameters(enable_parameters)
+    , m_enableLogging(enable_logging)
     , m_id(id)
     , m_serviceUpdateParams()
     , m_serviceUploadTrajectory()
@@ -112,10 +114,10 @@ public:
     m_serviceLand = n.advertiseService(tf_prefix + "/land", &CrazyflieROS::land, this);
     m_serviceHover = n.advertiseService(tf_prefix + "/hover", &CrazyflieROS::hover, this);
 
-
-    for (auto& logBlock : m_logBlocks)
-    {
-      m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(tf_prefix + "/" + logBlock.topic_name, 10));
+    if (m_enableLogging) {
+      for (auto& logBlock : m_logBlocks) {
+        m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(tf_prefix + "/" + logBlock.topic_name, 10));
+      }
     }
 
     // m_subscribeJoy = n.subscribe("/joy", 1, &CrazyflieROS::joyChanged, this);
@@ -189,7 +191,7 @@ public:
   void updateParam(uint8_t id, const std::string& ros_param) {
       U value;
       ros::param::get(ros_param, value);
-      m_cf.setParam<T>(id, (T)value);
+      m_cf.addSetParam<T>(id, (T)value);
   }
 
   bool updateParams(
@@ -197,6 +199,7 @@ public:
     crazyflie_driver::UpdateParams::Response& res)
   {
     ROS_INFO("[%s] Update parameters", m_frame.c_str());
+    m_cf.startSetParamRequest();
     for (auto&& p : req.params) {
       std::string ros_param = "/" + m_tf_prefix + "/" + p;
       size_t pos = p.find("/");
@@ -234,6 +237,7 @@ public:
         ROS_ERROR("Could not find param %s/%s", group.c_str(), name.c_str());
       }
     }
+    m_cf.setRequestedParams();
     return true;
   }
 
@@ -316,7 +320,7 @@ public:
     ros::CallbackQueue& queue)
   {
     // m_cf.reboot();
-    m_cf.syson();
+    // m_cf.syson();
     // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     auto start = std::chrono::system_clock::now();
@@ -361,31 +365,42 @@ public:
       n.setCallbackQueue(&queue);
       m_serviceUpdateParams = n.advertiseService(m_tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     }
+    auto end1 = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsedSeconds1 = end1-start;
+    ROS_INFO("[%s] reqParamTOC: %f s", m_frame.c_str(), elapsedSeconds1.count());
 
     // Logging
-    ROS_INFO("[%s] Requesting logging variables...", m_frame.c_str());
-    m_cf.requestLogToc();
+    if (m_enableLogging) {
+      ROS_INFO("[%s] Requesting logging variables...", m_frame.c_str());
+      m_cf.requestLogToc();
+      auto end2 = std::chrono::system_clock::now();
+      std::chrono::duration<double> elapsedSeconds2 = end2-end1;
+      ROS_INFO("[%s] reqLogTOC: %f s", m_frame.c_str(), elapsedSeconds2.count());
 
-    m_logBlocksGeneric.resize(m_logBlocks.size());
-    // custom log blocks
-    size_t i = 0;
-    for (auto& logBlock : m_logBlocks)
-    {
-      std::function<void(uint32_t, std::vector<double>*, void* userData)> cb =
-        std::bind(
-          &CrazyflieROS::onLogCustom,
-          this,
-          std::placeholders::_1,
-          std::placeholders::_2,
-          std::placeholders::_3);
+      m_logBlocksGeneric.resize(m_logBlocks.size());
+      // custom log blocks
+      size_t i = 0;
+      for (auto& logBlock : m_logBlocks)
+      {
+        std::function<void(uint32_t, std::vector<double>*, void* userData)> cb =
+          std::bind(
+            &CrazyflieROS::onLogCustom,
+            this,
+            std::placeholders::_1,
+            std::placeholders::_2,
+            std::placeholders::_3);
 
-      m_logBlocksGeneric[i].reset(new LogBlockGeneric(
-        &m_cf,
-        logBlock.variables,
-        (void*)&m_pubLogDataGeneric[i],
-        cb));
-      m_logBlocksGeneric[i]->start(logBlock.frequency / 10);
-      ++i;
+        m_logBlocksGeneric[i].reset(new LogBlockGeneric(
+          &m_cf,
+          logBlock.variables,
+          (void*)&m_pubLogDataGeneric[i],
+          cb));
+        m_logBlocksGeneric[i]->start(logBlock.frequency / 10);
+        ++i;
+      }
+      auto end3 = std::chrono::system_clock::now();
+      std::chrono::duration<double> elapsedSeconds3 = end3-end2;
+      ROS_INFO("[%s] logBlocks: %f s", m_frame.c_str(), elapsedSeconds1.count());
     }
 
     auto end = std::chrono::system_clock::now();
@@ -423,6 +438,7 @@ private:
   std::string m_frame;
   std::string m_worldFrame;
   bool m_enableParameters;
+  bool m_enableLogging;
   int m_id;
 
   ros::ServiceServer m_serviceUpdateParams;
@@ -586,9 +602,9 @@ public:
   void runSlow()
   {
     while(ros::ok() && !m_isEmergency) {
-      if (m_cfs.size() == 1) {
-        m_cfs[0]->sendPing();
-      }
+      // if (m_cfs.size() == 1) {
+      //   m_cfs[0]->sendPing();
+      // }
       m_slowQueue.callAvailable(ros::WallDuration(0));
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -657,6 +673,13 @@ private:
     const std::vector<crazyflie_driver::LogBlock>& logBlocks)
   {
     // read CF config
+    struct CFConfig
+    {
+      std::string uri;
+      std::string tf_prefix;
+      std::string frame;
+      int idNumber;
+    };
     ros::NodeHandle nGlobal;
 
     XmlRpc::XmlRpcValue crazyflies;
@@ -665,10 +688,11 @@ private:
 
     objects.clear();
     m_cfs.clear();
+    std::vector<CFConfig> cfConfigs;
     for (int32_t i = 0; i < crazyflies.size(); ++i) {
       ROS_ASSERT(crazyflies[i].getType() == XmlRpc::XmlRpcValue::TypeStruct);
       XmlRpc::XmlRpcValue crazyflie = crazyflies[i];
-      std::string id = crazyflie["id"];
+      int id = crazyflie["id"];
       int ch = crazyflie["channel"];
       if (ch == channel) {
         XmlRpc::XmlRpcValue pos = crazyflie["initialPosition"];
@@ -684,14 +708,35 @@ private:
         m = Eigen::Translation3f(posVec[0], posVec[1], posVec[2]);
         objects.push_back(libobjecttracker::Object(0, 0, m));
 
-        std::string uri = "radio://" + std::to_string(m_radio) + "/" + std::to_string(channel) + "/2M/E7E7E7E7" + id;
-        std::string tf_prefix = "cf" + id;
-        std::string frame = "cf" + id;
-        int idNumber;
-        std::sscanf(id.c_str(), "%x", &idNumber);
-        addCrazyflie(uri, tf_prefix, frame, idNumber, logBlocks);
-        updateParams(m_cfs.back());
+        std::stringstream sstr;
+        sstr << std::setfill ('0') << std::setw(2) << std::hex << id;
+        std::string idHex = sstr.str();
+
+        std::string uri = "radio://" + std::to_string(m_radio) + "/" + std::to_string(channel) + "/2M/E7E7E7E7" + idHex;
+        std::string tf_prefix = "cf" + std::to_string(id);
+        std::string frame = "cf" + std::to_string(id);
+        cfConfigs.push_back({uri, tf_prefix, frame, id});
       }
+    }
+
+    // Turn all CFs on
+    for (const auto& config : cfConfigs) {
+      Crazyflie cf(config.uri);
+      cf.syson();
+      for (size_t i = 0; i < 50; ++i) {
+        cf.sendPing();
+      }
+    }
+
+    // add Crazyflies
+    for (const auto& config : cfConfigs) {
+      addCrazyflie(config.uri, config.tf_prefix, config.frame, config.idNumber, logBlocks);
+
+      auto start = std::chrono::high_resolution_clock::now();
+      updateParams(m_cfs.back());
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> elapsed = end - start;
+      ROS_INFO("Update params: %f s", elapsed.count());
     }
   }
 
@@ -703,17 +748,25 @@ private:
     const std::vector<crazyflie_driver::LogBlock>& logBlocks)
   {
     ROS_INFO("Adding CF: %s (%s, %s)...", tf_prefix.c_str(), uri.c_str(), frame.c_str());
+    auto start = std::chrono::high_resolution_clock::now();
     CrazyflieROS* cf = new CrazyflieROS(
       uri,
       tf_prefix,
       frame,
       /*m_worldFrame*/ "/world",
-      true,
+      /*enable_parameters*/ true,
+      /*enable_logging*/ false,
       id,
       logBlocks,
       m_slowQueue
       );
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    ROS_INFO("CF ctor: %f s", elapsed.count());
     cf->run(m_slowQueue);
+    auto end2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed2 = end2 - end;
+    ROS_INFO("CF run: %f s", elapsed2.count());
     m_cfs.push_back(cf);
   }
 
@@ -953,7 +1006,7 @@ public:
 
       // Get the latency
       float viconLatency = client.GetLatencyTotal().Total;
-      if (viconLatency > 0.025) {
+      if (viconLatency > 0.030) {
         ROS_WARN("VICON Latency high: %f s.", viconLatency);
       }
 
@@ -1265,12 +1318,12 @@ int main(int argc, char **argv)
   nGlobal.getParam("crazyflies", crazyflies);
   ROS_ASSERT(crazyflies.getType() == XmlRpc::XmlRpcValue::TypeArray);
 
-  std::set<std::string> cfIds;
+  std::set<int> cfIds;
   for (int32_t i = 0; i < crazyflies.size(); ++i)
   {
     ROS_ASSERT(crazyflies[i].getType() == XmlRpc::XmlRpcValue::TypeStruct);
     XmlRpc::XmlRpcValue crazyflie = crazyflies[i];
-    std::string id = crazyflie["id"];
+    int id = crazyflie["id"];
     int channel = crazyflie["channel"];
     if (cfIds.find(id) != cfIds.end()) {
       ROS_FATAL("CF with the same id twice in configuration!");
