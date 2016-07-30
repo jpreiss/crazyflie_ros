@@ -16,7 +16,6 @@ std::istream& operator>>(std::istream& in, Mode& mode)
 {
   std::string token;
   in >> token;
-  std::cout << token << std::endl;
   if (token == "firmware")
     mode = RebootToFirmware;
   else if (token == "bootloader")
@@ -44,7 +43,7 @@ int main(int argc, char **argv)
   desc.add_options()
     ("help", "produce help message")
     ("uri", po::value<std::string>(&uri)->default_value(defaultUri), "unique ressource identifier")
-    ("mode", po::value<Mode>(&mode)->default_value(mode), "reboot mode {firmware,bootloader,shutdown}")
+    ("mode", po::value<Mode>(&mode)->default_value(mode), "reboot mode {firmware,bootloader,sysoff,syson,alloff}")
   ;
 
   try
@@ -67,7 +66,6 @@ int main(int argc, char **argv)
 
   try
   {
-    std::cout << mode << std::endl;
     Crazyflie cf(uri);
     switch (mode)
     {
