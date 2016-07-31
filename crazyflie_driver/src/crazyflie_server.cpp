@@ -937,24 +937,43 @@ public:
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
 
-    // Create all groups and run their threads
+    // Create all groups in parallel and launch threads
+    {
+      std::vector<std::future<CrazyflieGroup*> > handles;
+      int r = 0;
+      std::cout << "ch: " << channels.size() << std::endl;
+      for (int channel : channels) {
+        auto handle = std::async(std::launch::async,
+            [&](int channel, int radio)
+            {
+              // std::cout << "radio: " << radio << std::endl;
+              return new CrazyflieGroup(
+                dynamicsConfigurations,
+                markerConfigurations,
+                &client,
+                markers,
+                radio,
+                channel,
+                broadcastAddress,
+                useViconTracker,
+                logBlocks);
+            },
+            channel,
+            r
+          );
+        handles.push_back(std::move(handle));
+        ++r;
+      }
+
+      for (auto& handle : handles) {
+        m_groups.push_back(handle.get());
+      }
+    }
+
+    // start the groups threads
     std::vector<std::thread> threads;
-    int radio = 0;
-    for (int channel : channels) {
-      m_groups.push_back(
-        new CrazyflieGroup(
-          dynamicsConfigurations,
-          markerConfigurations,
-          &client,
-          markers,
-          radio,
-          channel,
-          broadcastAddress,
-          useViconTracker,
-          logBlocks));
-      // threads.push_back(std::thread(&CrazyflieGroup::runFast, m_groups.back()));
-      threads.push_back(std::thread(&CrazyflieGroup::runSlow, m_groups.back()));
-      ++radio;
+    for (auto& group : m_groups) {
+      threads.push_back(std::thread(&CrazyflieGroup::runSlow, group));
     }
 
     ROS_INFO("Started %lu threads", threads.size());
