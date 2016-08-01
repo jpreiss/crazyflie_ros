@@ -462,7 +462,7 @@ private:
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
   ros::ServiceServer m_serviceHover;
-  ros::ServiceServer m_serviceStartAvoidTarget;
+  ros::ServiceServer m_serviceAvoidTarget;
 
 
   std::vector<crazyflie_driver::LogBlock> m_logBlocks;

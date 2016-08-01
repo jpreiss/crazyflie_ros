@@ -199,7 +199,7 @@ public:
 
   void avoidTarget(
     float x, float y, float z,
-    float max_speed, float max_displacement);
+    float max_displacement, float max_speed);
 
   static size_t size(LogType t) {
     switch(t) {
