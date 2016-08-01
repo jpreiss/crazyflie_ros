@@ -197,6 +197,10 @@ public:
     float targetHeight,
     uint16_t time_in_ms);
 
+  void avoidTarget(
+    float x, float y, float z,
+    float max_speed, float max_displacement);
+
   static size_t size(LogType t) {
     switch(t) {
       case LogTypeUint8:

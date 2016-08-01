@@ -654,6 +654,17 @@ void Crazyflie::land(
   handleRequests();
 }
 
+void Crazyflie::avoidTarget(
+  float x, float y, float z,
+  float maxDisplacement, float maxSpeed)
+{
+  crtpTrajectoryAvoidTargetRequest request(x, y, z, maxDisplacement, maxSpeed);
+
+  startBatchRequest();
+  addRequest(request, 2);
+  handleRequests();
+}
+
 
 bool Crazyflie::sendPacket(
   const uint8_t* data,

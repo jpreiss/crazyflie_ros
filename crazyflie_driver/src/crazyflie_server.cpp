@@ -113,6 +113,7 @@ public:
     m_serviceTakeoff = n.advertiseService(tf_prefix + "/takeoff", &CrazyflieROS::takeoff, this);
     m_serviceLand = n.advertiseService(tf_prefix + "/land", &CrazyflieROS::land, this);
     m_serviceHover = n.advertiseService(tf_prefix + "/hover", &CrazyflieROS::hover, this);
+    m_serviceAvoidTarget = n.advertiseService(tf_prefix + "/avoid_target", &CrazyflieROS::avoidTarget, this);
 
     if (m_enableLogging) {
       for (auto& logBlock : m_logBlocks) {
@@ -316,6 +317,20 @@ public:
     return true;
   }
 
+  bool avoidTarget(
+    crazyflie_driver::AvoidTarget::Request& req,
+    crazyflie_driver::AvoidTarget::Response& res)
+  {
+    ROS_INFO("[%s] Avoid Target", m_frame.c_str());
+
+    m_cf.avoidTarget(
+      req.home.x, req.home.y, req.home.z,
+      req.max_displacement, req.max_speed);
+
+    return true;
+  }
+
+
   void run(
     ros::CallbackQueue& queue)
   {
@@ -447,6 +462,7 @@ private:
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
   ros::ServiceServer m_serviceHover;
+  ros::ServiceServer m_serviceStartAvoidTarget;
 
 
   std::vector<crazyflie_driver::LogBlock> m_logBlocks;
@@ -470,7 +486,9 @@ public:
     int channel,
     const std::string broadcastAddress,
     bool useViconTracker,
-    const std::vector<crazyflie_driver::LogBlock>& logBlocks)
+    const std::vector<crazyflie_driver::LogBlock>& logBlocks,
+    std::string interactiveObject
+    )
     : m_cfs()
     , m_tracker(nullptr)
     , m_radio(radio)
@@ -481,6 +499,7 @@ public:
     , m_isEmergency(false)
     , m_useViconTracker(useViconTracker)
     , m_br()
+    , m_interactiveObject(interactiveObject)
   {
     std::vector<libobjecttracker::Object> objects;
     readObjects(objects, channel, logBlocks);
@@ -504,46 +523,15 @@ public:
     auto stamp = std::chrono::high_resolution_clock::now();
 
     std::vector<stateExternalBringup> states;
+
+    if (!m_interactiveObject.empty()) {
+      // TODO get 0xFF from packetdef.h???
+      publishViconObject(m_interactiveObject, 0xFF, states);
+    }
+
     if (m_useViconTracker) {
-      using namespace ViconDataStreamSDK::CPP;
-
       for (auto cf : m_cfs) {
-        std::string subjectName = cf->frame();
-        std::string segmentName = cf->frame();
-
-        Output_GetSegmentGlobalTranslation translation = m_pClient->GetSegmentGlobalTranslation(subjectName, segmentName);
-        Output_GetSegmentGlobalRotationQuaternion quaternion = m_pClient->GetSegmentGlobalRotationQuaternion(subjectName, segmentName);
-
-        if (   translation.Result == Result::Success
-            && quaternion.Result == Result::Success
-            && !translation.Occluded
-            && !quaternion.Occluded) {
-
-          states.resize(states.size() + 1);
-          states.back().id = cf->id();
-          states.back().x = translation.Translation[0] / 1000.0;
-          states.back().y = translation.Translation[1] / 1000.0;
-          states.back().z = translation.Translation[2] / 1000.0;
-          states.back().q0 = quaternion.Rotation[0];
-          states.back().q1 = quaternion.Rotation[1];
-          states.back().q2 = quaternion.Rotation[2];
-          states.back().q3 = quaternion.Rotation[3];
-
-          tf::Transform transform;
-          transform.setOrigin(tf::Vector3(
-            translation.Translation[0] / 1000.0,
-            translation.Translation[1] / 1000.0,
-            translation.Translation[2] / 1000.0));
-          tf::Quaternion q(
-            quaternion.Rotation[0],
-            quaternion.Rotation[1],
-            quaternion.Rotation[2],
-            quaternion.Rotation[3]);
-          transform.setRotation(q);
-          m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", cf->frame()));
-        } else {
-          ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
-        }
+        publishViconObject(cf->frame(), cf->id(), states);
       }
     } else {
       // run object tracker
@@ -667,6 +655,45 @@ public:
   }
 
 private:
+  void publishViconObject(std::string name, uint8_t id, std::vector<stateExternalBringup> &states)
+  {
+    using namespace ViconDataStreamSDK::CPP;
+
+    Output_GetSegmentGlobalTranslation translation = m_pClient->GetSegmentGlobalTranslation(name, name);
+    Output_GetSegmentGlobalRotationQuaternion quaternion = m_pClient->GetSegmentGlobalRotationQuaternion(name, name);
+
+    if (   translation.Result == Result::Success
+        && quaternion.Result == Result::Success
+        && !translation.Occluded
+        && !quaternion.Occluded) {
+
+      states.resize(states.size() + 1);
+      states.back().id = id;
+      states.back().x = translation.Translation[0] / 1000.0;
+      states.back().y = translation.Translation[1] / 1000.0;
+      states.back().z = translation.Translation[2] / 1000.0;
+      states.back().q0 = quaternion.Rotation[0];
+      states.back().q1 = quaternion.Rotation[1];
+      states.back().q2 = quaternion.Rotation[2];
+      states.back().q3 = quaternion.Rotation[3];
+
+      tf::Transform transform;
+      transform.setOrigin(tf::Vector3(
+        translation.Translation[0] / 1000.0,
+        translation.Translation[1] / 1000.0,
+        translation.Translation[2] / 1000.0));
+      tf::Quaternion q(
+        quaternion.Rotation[0],
+        quaternion.Rotation[1],
+        quaternion.Rotation[2],
+        quaternion.Rotation[3]);
+      transform.setRotation(q);
+      m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", name));
+    } else {
+      ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
+    }
+  }
+
   void readObjects(
     std::vector<libobjecttracker::Object>& objects,
     int channel,
@@ -811,6 +838,7 @@ private:
 
 private:
   std::vector<CrazyflieROS*> m_cfs;
+  std::string m_interactiveObject;
   libobjecttracker::ObjectTracker* m_tracker;
   int m_radio;
   ViconDataStreamSDK::CPP::Client* m_pClient;
@@ -896,12 +924,14 @@ public:
     std::string broadcastAddress;
     bool useViconTracker;
     std::string logFilePath;
+    std::string interactiveObject;
 
     ros::NodeHandle nl("~");
     nl.getParam("host_name", hostName);
     nl.getParam("use_vicon_tracker", useViconTracker);
     nl.getParam("broadcast_address", broadcastAddress);
     nl.param<std::string>("save_point_clouds", logFilePath, "");
+    nl.param<std::string>("interactive_object", interactiveObject, "");
 
     libobjecttracker::PointCloudLogger pointCloudLogger(logFilePath);
     const bool logClouds = !logFilePath.empty();
@@ -956,7 +986,8 @@ public:
                 channel,
                 broadcastAddress,
                 useViconTracker,
-                logBlocks);
+                logBlocks,
+                interactiveObject);
             },
             channel,
             r
@@ -994,6 +1025,9 @@ public:
       client.EnableSegmentData();
     } else {
       client.EnableUnlabeledMarkerData();
+      if (!interactiveObject.empty()) {
+        client.EnableSegmentData();
+      }
     }
 
     // This is the lowest latency option
