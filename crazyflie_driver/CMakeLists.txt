@@ -49,6 +49,7 @@ add_service_files(
   Takeoff.srv
   Land.srv
   StartCannedTrajectory.srv
+  AvoidTarget.srv
 )
 
 add_message_files(

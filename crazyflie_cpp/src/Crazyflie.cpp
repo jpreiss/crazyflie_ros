@@ -658,7 +658,7 @@ void Crazyflie::avoidTarget(
   float x, float y, float z,
   float maxDisplacement, float maxSpeed)
 {
-  crtpTrajectoryAvoidTargetRequest request(x, y, z, maxDisplacement, maxSpeed);
+  crtpTrajectoryStartAvoidTargetRequest request(x, y, z, maxDisplacement, maxSpeed);
 
   startBatchRequest();
   addRequest(request, 2);

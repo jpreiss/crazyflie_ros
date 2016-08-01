@@ -9,6 +9,7 @@
 #include "crazyflie_driver/UpdateParams.h"
 #include "crazyflie_driver/UploadTrajectory.h"
 #include "crazyflie_driver/StartCannedTrajectory.h"
+#include "crazyflie_driver/AvoidTarget.h"
 #undef major
 #undef minor
 #include "crazyflie_driver/SetEllipse.h"
@@ -655,7 +656,7 @@ public:
   }
 
 private:
-  void publishViconObject(std::string name, uint8_t id, std::vector<stateExternalBringup> &states)
+  void publishViconObject(const std::string& name, uint8_t id, std::vector<stateExternalBringup> &states)
   {
     using namespace ViconDataStreamSDK::CPP;
 
@@ -690,7 +691,7 @@ private:
       transform.setRotation(q);
       m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", name));
     } else {
-      ROS_WARN("No updated pose for CF %s", cf->frame().c_str());
+      ROS_WARN("No updated pose for Vicon object %s", name.c_str());
     }
   }
 

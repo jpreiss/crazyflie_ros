@@ -485,7 +485,7 @@ struct crtpTrajectoryResetRequest
 {
   crtpTrajectoryResetRequest()
     : header(14, 1)
-    , command(COMMAND_RESET)
+    , command(COMMAND_RESET_POLY)
     {
     }
 
@@ -498,13 +498,13 @@ struct crtpTrajectoryAddRequest
 {
   crtpTrajectoryAddRequest()
     : header(14, 1)
-    , command(COMMAND_ADD)
+    , command(COMMAND_ADD_POLY)
     {
     }
 
     const crtp header;
     const uint8_t command;
-    struct data_add data;
+    struct data_add_poly data;
 } __attribute__((packed));
 CHECKSIZE(crtpTrajectoryAddRequest)
 
@@ -512,7 +512,7 @@ struct crtpTrajectoryStartRequest
 {
   crtpTrajectoryStartRequest()
     : header(14, 1)
-    , command(COMMAND_START_TRAJECTORY)
+    , command(COMMAND_START_POLY)
     {
     }
 
@@ -651,7 +651,7 @@ struct crtpTrajectoryStartAvoidTargetRequest
 
     const crtp header;
     const uint8_t command;
-    struct data_start_avoid_target data; 
+    struct data_start_avoid_target data;
 } __attribute__((packed));
 CHECKSIZE(crtpTrajectoryStartAvoidTargetRequest)
 
