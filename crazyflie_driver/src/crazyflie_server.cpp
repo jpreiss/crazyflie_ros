@@ -555,6 +555,43 @@ public:
     delete m_tracker;
   }
 
+  void runInteractiveObject(std::vector<stateExternalBringup> &states)
+  {
+    auto const position = m_pClient->GetSegmentGlobalTranslation(
+      m_interactiveObject, m_interactiveObject);
+
+    if (position.Result != ViconDataStreamSDK::CPP::Result::Success) {
+      ROS_INFO("Interactive object GetSegmentGlobalTranslation failed");
+      return;
+    }
+
+    if (position.Occluded) {
+      // ROS_INFO("Interactive object is occluded");
+      return;
+    }
+
+    // this is kind of a hack -- make sure the interactive object
+    // is not very close to the floor. this is an extra measure to avoid
+    // fitting the interactive object to idle Crazyflies on the floor.
+    // obviously this only works if the interactive object is expected
+    // to be elevated above the floor all the time.
+    if (position.Translation[2] < 100) {
+      ROS_INFO("Interactive object is too close to floor");
+      return;
+    }
+
+    // only publish the interactive object if all of its markers are visible.
+    // this avoids the issue of Vicon Tracker fitting the interactive object
+    // to other markers in the scene (i.e. Crazyflies)
+    // when the interactive object is not actually in the scene at all.
+    // (this will print its own ROS_INFO error messages on failure)
+    bool const allVisible = viconObjectAllMarkersVisible(*m_pClient, m_interactiveObject);
+    if (allVisible) {
+      // TODO get 0xFF from packetdef.h???
+      publishViconObject(m_interactiveObject, 0xFF, states);
+    }
+  }
+
   void runFast()
   {
     auto stamp = std::chrono::high_resolution_clock::now();
@@ -562,31 +599,7 @@ public:
     std::vector<stateExternalBringup> states;
 
     if (!m_interactiveObject.empty()) {
-      // only publish the interactive object if all of its markers are visible.
-      // this avoids the issue of Vicon Tracker fitting the interactive object
-      // to other markers in the scene (i.e. Crazyflies)
-      // when the interactive object is not actually in the scene at all.
-      bool const allVisible = viconObjectAllMarkersVisible(*m_pClient, m_interactiveObject);
-
-      // also -- this is kind of a hack -- make sure the interactive object
-      // is not very close to the floor. this is an extra measure to avoid
-      // fitting the interactive object to idle Crazyflies on the floor.
-      // obviously this only works if the interactive object is expected
-      // to be elevated above the floor all the time.
-      auto const position = m_pClient->GetSegmentGlobalTranslation(
-        m_interactiveObject, m_interactiveObject);
-      bool const aboveFloor =
-        position.Result == ViconDataStreamSDK::CPP::Result::Success &&
-        !position.Occluded && 
-        position.Translation[2] > 100; // millimeters
-      if (!aboveFloor) {
-        ROS_INFO("Interactive object too close to floor");
-      }
-
-      if (allVisible && aboveFloor) {
-        // TODO get 0xFF from packetdef.h???
-        publishViconObject(m_interactiveObject, 0xFF, states);
-      }
+      runInteractiveObject(states);
     }
 
     if (m_useViconTracker) {
