@@ -48,6 +48,7 @@
 
 #include <fstream>
 #include <future>
+#include <mutex>
 
 /*
 Threading
@@ -77,6 +78,41 @@ double radToDeg(double rad) {
 void logWarn(const std::string& msg)
 {
   ROS_WARN("%s", msg.c_str());
+}
+
+// TODO this is incredibly dumb, fix it
+std::mutex viconClientMutex;
+
+static bool viconObjectAllMarkersVisible(
+  ViconDataStreamSDK::CPP::Client &client, std::string const &objName)
+{
+  std::lock_guard<std::mutex> guard(viconClientMutex);
+  using namespace ViconDataStreamSDK::CPP;
+  auto output = client.GetMarkerCount(objName);
+  if (output.Result != Result::Success) {
+    return false;
+  }
+  bool ok = true;
+  for (unsigned i = 0; i < output.MarkerCount; ++i) {
+    auto marker = client.GetMarkerName(objName, i);
+    if (marker.Result != Result::Success) {
+      ROS_INFO("GetMarkerName fail on marker %d", i);
+      return false;
+    }
+    auto position = client.GetMarkerGlobalTranslation(objName, marker.MarkerName);
+    if (position.Result != Result::Success) {
+      ROS_INFO("GetMarkerGlobalTranslation fail on marker %s",
+        std::string(marker.MarkerName).c_str());
+      return false;
+    }
+    if (position.Occluded) {
+      ROS_INFO("Interactive object marker %s occluded with z = %f",
+        std::string(marker.MarkerName).c_str(), position.Translation[2]);
+      ok = false;
+      // don't early return; we want to print messages for all occluded markers
+    }
+  }
+  return ok;
 }
 
 class CrazyflieROS
@@ -526,8 +562,31 @@ public:
     std::vector<stateExternalBringup> states;
 
     if (!m_interactiveObject.empty()) {
-      // TODO get 0xFF from packetdef.h???
-      publishViconObject(m_interactiveObject, 0xFF, states);
+      // only publish the interactive object if all of its markers are visible.
+      // this avoids the issue of Vicon Tracker fitting the interactive object
+      // to other markers in the scene (i.e. Crazyflies)
+      // when the interactive object is not actually in the scene at all.
+      bool const allVisible = viconObjectAllMarkersVisible(*m_pClient, m_interactiveObject);
+
+      // also -- this is kind of a hack -- make sure the interactive object
+      // is not very close to the floor. this is an extra measure to avoid
+      // fitting the interactive object to idle Crazyflies on the floor.
+      // obviously this only works if the interactive object is expected
+      // to be elevated above the floor all the time.
+      auto const position = m_pClient->GetSegmentGlobalTranslation(
+        m_interactiveObject, m_interactiveObject);
+      bool const aboveFloor =
+        position.Result == ViconDataStreamSDK::CPP::Result::Success &&
+        !position.Occluded && 
+        position.Translation[2] > 100; // millimeters
+      if (!aboveFloor) {
+        ROS_INFO("Interactive object too close to floor");
+      }
+
+      if (allVisible && aboveFloor) {
+        // TODO get 0xFF from packetdef.h???
+        publishViconObject(m_interactiveObject, 0xFF, states);
+      }
     }
 
     if (m_useViconTracker) {
@@ -1027,6 +1086,7 @@ public:
     } else {
       client.EnableUnlabeledMarkerData();
       if (!interactiveObject.empty()) {
+        client.EnableMarkerData();
         client.EnableSegmentData();
       }
     }
@@ -1060,7 +1120,7 @@ public:
 
       // Get the latency
       float viconLatency = client.GetLatencyTotal().Total;
-      if (viconLatency > 0.030) {
+      if (viconLatency > 0.035) {
         ROS_WARN("VICON Latency high: %f s.", viconLatency);
       }
 
@@ -1113,7 +1173,7 @@ public:
       auto endIteration = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> elapsed = endIteration - startIteration;
       double elapsedSeconds = elapsed.count();
-      if (elapsedSeconds > 0.005) {
+      if (elapsedSeconds > 0.009) {
         ROS_WARN("Latency too high! Is %f s.", elapsedSeconds);
       }
 
