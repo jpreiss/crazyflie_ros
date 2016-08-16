@@ -49,6 +49,7 @@
 #include <fstream>
 #include <future>
 #include <mutex>
+#include <wordexp.h> // tilde expansion
 
 /*
 Threading
@@ -1005,6 +1006,14 @@ public:
     nl.getParam("broadcast_address", broadcastAddress);
     nl.param<std::string>("save_point_clouds", logFilePath, "");
     nl.param<std::string>("interactive_object", interactiveObject, "");
+
+    // tilde-expansion
+    wordexp_t wordexp_result;
+    if (wordexp(logFilePath.c_str(), &wordexp_result, 0) == 0) {
+      // success - only read first result, could be more if globs were used
+      logFilePath = wordexp_result.we_wordv[0];
+    }
+    wordfree(&wordexp_result);
 
     libobjecttracker::PointCloudLogger pointCloudLogger(logFilePath);
     const bool logClouds = !logFilePath.empty();
