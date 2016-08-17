@@ -663,10 +663,16 @@ public:
 
   void runSlow()
   {
+    ros::NodeHandle nl("~");
+    bool enableLogging;
+    nl.getParam("enable_logging", enableLogging);
+
     while(ros::ok() && !m_isEmergency) {
-      // if (m_cfs.size() == 1) {
-      //   m_cfs[0]->sendPing();
-      // }
+      if (enableLogging) {
+        for (const auto& cf : m_cfs) {
+          cf->sendPing();
+        }
+      }
       m_slowQueue.callAvailable(ros::WallDuration(0));
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -829,9 +835,16 @@ private:
       }
     }
 
+    ros::NodeHandle nl("~");
+    bool enableLogging;
+    bool enableParameters;
+
+    nl.getParam("enable_logging", enableLogging);
+    nl.getParam("enable_parameters", enableParameters);
+
     // add Crazyflies
     for (const auto& config : cfConfigs) {
-      addCrazyflie(config.uri, config.tf_prefix, config.frame, config.idNumber, logBlocks);
+      addCrazyflie(config.uri, config.tf_prefix, config.frame, "/world", enableParameters, enableLogging, config.idNumber, logBlocks);
 
       auto start = std::chrono::high_resolution_clock::now();
       updateParams(m_cfs.back());
@@ -845,6 +858,9 @@ private:
     const std::string& uri,
     const std::string& tf_prefix,
     const std::string& frame,
+    const std::string& worldFrame,
+    bool enableParameters,
+    bool enableLogging,
     int id,
     const std::vector<crazyflie_driver::LogBlock>& logBlocks)
   {
@@ -854,9 +870,9 @@ private:
       uri,
       tf_prefix,
       frame,
-      /*m_worldFrame*/ "/world",
-      /*enable_parameters*/ true,
-      /*enable_logging*/ false,
+      worldFrame,
+      enableParameters,
+      enableLogging,
       id,
       logBlocks,
       m_slowQueue
@@ -1217,9 +1233,6 @@ public:
   void runSlow()
   {
     while(ros::ok() && !m_isEmergency) {
-      // if (m_cfs.size() == 1) {
-      //   m_cfs[0]->sendPing();
-      // }
       m_queue.callAvailable(ros::WallDuration(0));
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
