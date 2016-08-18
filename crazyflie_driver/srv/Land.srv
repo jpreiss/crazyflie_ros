@@ -1,3 +1,4 @@
+uint8 group
 float32 height
 duration time_from_start
 ---

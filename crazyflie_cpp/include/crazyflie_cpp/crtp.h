@@ -510,27 +510,32 @@ CHECKSIZE(crtpTrajectoryAddRequest)
 
 struct crtpTrajectoryStartRequest
 {
-  crtpTrajectoryStartRequest()
+  crtpTrajectoryStartRequest(
+    uint8_t group)
     : header(14, 1)
     , command(COMMAND_START_POLY)
     {
+      data.group = group;
     }
 
     const crtp header;
     const uint8_t command;
+    struct data_start_poly data;
 } __attribute__((packed));
 CHECKSIZE(crtpTrajectoryStartRequest)
 
 struct crtpTrajectoryTakeoffRequest
 {
   crtpTrajectoryTakeoffRequest(
+    uint8_t group,
     float height,
     uint16_t time_from_start)
     : header(14, 1)
     , command(COMMAND_TAKEOFF)
     {
-        data.height = height;
-        data.time_from_start = time_from_start;
+      data.group = group;
+      data.height = height;
+      data.time_from_start = time_from_start;
     }
 
     const crtp header;
@@ -542,13 +547,15 @@ CHECKSIZE(crtpTrajectoryTakeoffRequest)
 struct crtpTrajectoryLandRequest
 {
   crtpTrajectoryLandRequest(
+    uint8_t group,
     float height,
     uint16_t time_from_start)
     : header(14, 1)
     , command(COMMAND_LAND)
     {
-        data.height = height;
-        data.time_from_start = time_from_start;
+      data.group = group;
+      data.height = height;
+      data.time_from_start = time_from_start;
     }
 
     const crtp header;
@@ -579,26 +586,32 @@ struct crtpTrajectoryHoverRequest
 
 struct crtpTrajectoryStartEllipseRequest
 {
-  crtpTrajectoryStartEllipseRequest()
+  crtpTrajectoryStartEllipseRequest(
+    uint8_t group)
     : header(14, 1)
     , command(COMMAND_START_ELLIPSE)
     {
+      data.group = group;
     }
 
     const crtp header;
     const uint8_t command;
+    struct data_start_ellipse data;
 } __attribute__((packed));
 
 struct crtpTrajectoryGoHomeRequest
 {
-  crtpTrajectoryGoHomeRequest()
+  crtpTrajectoryGoHomeRequest(
+    uint8_t group)
     : header(14, 1)
     , command(COMMAND_GOHOME)
     {
+      data.group = group;
     }
 
     const crtp header;
     const uint8_t command;
+    struct data_gohome data;
 } __attribute__((packed));
 CHECKSIZE(crtpTrajectoryHoverRequest)
 
@@ -619,11 +632,13 @@ CHECKSIZE(crtpTrajectorySetEllipseRequest)
 struct crtpTrajectoryStartCannedRequest
 {
   crtpTrajectoryStartCannedRequest(
+    uint8_t group,
     uint16_t trajectory,
     float timescale)
     : header(14, 1)
     , command(COMMAND_START_CANNED_TRAJECTORY)
     {
+      data.group = group;
       data.trajectory = trajectory;
       data.timescale = timescale;
     }
@@ -654,6 +669,22 @@ struct crtpTrajectoryStartAvoidTargetRequest
     struct data_start_avoid_target data;
 } __attribute__((packed));
 CHECKSIZE(crtpTrajectoryStartAvoidTargetRequest)
+
+struct crtpTrajectorySetGroupRequest
+{
+  crtpTrajectorySetGroupRequest(
+    uint8_t group)
+    : header(14, 1)
+    , command(COMMAND_SET_GROUP)
+    {
+      data.group = group;
+    }
+
+    const crtp header;
+    const uint8_t command;
+    struct data_set_group data;
+} __attribute__((packed));
+CHECKSIZE(crtpTrajectorySetGroupRequest)
 
 // struct crtpTrajectoryStateRequest
 // {

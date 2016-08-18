@@ -190,16 +190,21 @@ public:
     float period);
 
   void takeoff(
+    uint8_t group,
     float targetHeight,
     uint16_t time_in_ms);
 
   void land(
+    uint8_t group,
     float targetHeight,
     uint16_t time_in_ms);
 
   void avoidTarget(
     float x, float y, float z,
     float max_displacement, float max_speed);
+
+  void setGroup(
+    uint8_t group);
 
   static size_t size(LogType t) {
     switch(t) {
@@ -619,21 +624,27 @@ public:
   CrazyflieBroadcaster(
     const std::string& link_uri);
 
-  void trajectoryStart();
-  // void setTrajectoryState(bool state);
+  void trajectoryStart(
+    uint8_t group);
 
   void takeoff(
+    uint8_t group,
     float targetHeight,
     uint16_t time_in_ms);
 
   void land(
+    uint8_t group,
     float targetHeight,
     uint16_t time_in_ms);
 
-  void ellipse();
-  void goHome();
+  void ellipse(
+    uint8_t group);
+
+  void goHome(
+    uint8_t group);
 
   void startCannedTrajectory(
+    uint8_t group,
     uint16_t trajectory, // one of enum trajectory_type
     float timescale);
 

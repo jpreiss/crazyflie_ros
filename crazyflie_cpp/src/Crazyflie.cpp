@@ -633,10 +633,11 @@ void Crazyflie::setEllipse(
 }
 
 void Crazyflie::takeoff(
+  uint8_t group,
   float targetHeight,
   uint16_t time_in_ms)
 {
-  crtpTrajectoryTakeoffRequest request(targetHeight, time_in_ms);
+  crtpTrajectoryTakeoffRequest request(group, targetHeight, time_in_ms);
 
   startBatchRequest();
   addRequest(request, 2);
@@ -644,10 +645,11 @@ void Crazyflie::takeoff(
 }
 
 void Crazyflie::land(
+  uint8_t group,
   float targetHeight,
   uint16_t time_in_ms)
 {
-  crtpTrajectoryTakeoffRequest request(targetHeight, time_in_ms);
+  crtpTrajectoryTakeoffRequest request(group, targetHeight, time_in_ms);
 
   startBatchRequest();
   addRequest(request, 2);
@@ -665,6 +667,15 @@ void Crazyflie::avoidTarget(
   handleRequests();
 }
 
+void Crazyflie::setGroup(
+  uint8_t group)
+{
+  crtpTrajectorySetGroupRequest request(group);
+
+  startBatchRequest();
+  addRequest(request, 2);
+  handleRequests();
+}
 
 bool Crazyflie::sendPacket(
   const uint8_t* data,
@@ -1028,9 +1039,10 @@ void CrazyflieBroadcaster::send2Packets(
   m_radio->send2PacketsNoAck(data, length);
 }
 
-void CrazyflieBroadcaster::trajectoryStart()
+void CrazyflieBroadcaster::trajectoryStart(
+  uint8_t group)
 {
-  crtpTrajectoryStartRequest request;
+  crtpTrajectoryStartRequest request(group);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
@@ -1041,40 +1053,45 @@ void CrazyflieBroadcaster::trajectoryStart()
 // }
 
 void CrazyflieBroadcaster::takeoff(
+  uint8_t group,
   float targetHeight,
   uint16_t time_in_ms)
 {
   // crtpTrajectoryTakeoffRequest request(1.0, 2000);
-  crtpTrajectoryTakeoffRequest request(targetHeight, time_in_ms);
+  crtpTrajectoryTakeoffRequest request(group, targetHeight, time_in_ms);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
 void CrazyflieBroadcaster::land(
+  uint8_t group,
   float targetHeight,
   uint16_t time_in_ms)
 {
   // crtpTrajectoryLandRequest request(0.06, 2000);
-  crtpTrajectoryLandRequest request(targetHeight, time_in_ms);
+  crtpTrajectoryLandRequest request(group, targetHeight, time_in_ms);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
-void CrazyflieBroadcaster::ellipse()
+void CrazyflieBroadcaster::ellipse(
+  uint8_t group)
 {
-  crtpTrajectoryStartEllipseRequest request;
+  crtpTrajectoryStartEllipseRequest request(group);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
-void CrazyflieBroadcaster::goHome()
+void CrazyflieBroadcaster::goHome(
+  uint8_t group)
 {
-  crtpTrajectoryGoHomeRequest request;
+  crtpTrajectoryGoHomeRequest request(group);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 
 void CrazyflieBroadcaster::startCannedTrajectory(
+  uint8_t group,
   uint16_t trajectory, // one of enum trajectory_type
   float timescale)
 {
-  crtpTrajectoryStartCannedRequest request(trajectory, timescale);
+  crtpTrajectoryStartCannedRequest request(group, trajectory, timescale);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 

@@ -10,6 +10,10 @@
 #include <crazyflie_driver/UploadTrajectory.h>
 #include <crazyflie_driver/Takeoff.h>
 #include <crazyflie_driver/Land.h>
+#include <crazyflie_driver/StartTrajectory.h>
+#include <crazyflie_driver/StartEllipse.h>
+#include <crazyflie_driver/GoHome.h>
+
 
 
 namespace Xbox360Buttons {
@@ -112,6 +116,7 @@ private:
     void takeoff()
     {
         crazyflie_driver::Takeoff srv;
+        srv.request.group = 0;
         srv.request.height = 1.0;
         srv.request.time_from_start = ros::Duration(2.0);
         m_serviceTakeoff.call(srv);
@@ -120,6 +125,7 @@ private:
     void land()
     {
         crazyflie_driver::Land srv;
+        srv.request.group = 0;
         srv.request.height = 0.06;
         srv.request.time_from_start = ros::Duration(2.0);
         m_serviceLand.call(srv);
@@ -127,19 +133,22 @@ private:
 
     void startTrajectory()
     {
-        std_srvs::Empty srv;
+        crazyflie_driver::StartTrajectory srv;
+        srv.request.group = 0;
         m_serviceStartTrajectory.call(srv);
     }
 
     void ellipse()
     {
-        std_srvs::Empty srv;
+        crazyflie_driver::StartEllipse srv;
+        srv.request.group = 0;
         m_serviceEllipse.call(srv);
     }
 
     void goHome()
     {
-        std_srvs::Empty srv;
+        crazyflie_driver::GoHome srv;
+        srv.request.group = 0;
         m_serviceGoHome.call(srv);
     }
 

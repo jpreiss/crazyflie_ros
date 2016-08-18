@@ -16,6 +16,10 @@
 #include "crazyflie_driver/Takeoff.h"
 #include "crazyflie_driver/Land.h"
 #include "crazyflie_driver/Hover.h"
+#include "crazyflie_driver/StartTrajectory.h"
+#include "crazyflie_driver/StartEllipse.h"
+#include "crazyflie_driver/GoHome.h"
+#include "crazyflie_driver/SetGroup.h"
 #include "std_srvs/Empty.h"
 #include "geometry_msgs/Twist.h"
 #include "sensor_msgs/Imu.h"
@@ -105,6 +109,8 @@ public:
     , m_serviceTakeoff()
     , m_serviceLand()
     , m_serviceHover()
+    , m_serviceAvoidTarget()
+    , m_serviceSetGroup()
     , m_logBlocks(log_blocks)
   {
     ros::NodeHandle n;
@@ -115,6 +121,7 @@ public:
     m_serviceLand = n.advertiseService(tf_prefix + "/land", &CrazyflieROS::land, this);
     m_serviceHover = n.advertiseService(tf_prefix + "/hover", &CrazyflieROS::hover, this);
     m_serviceAvoidTarget = n.advertiseService(tf_prefix + "/avoid_target", &CrazyflieROS::avoidTarget, this);
+    m_serviceSetGroup = n.advertiseService(tf_prefix + "/set_group", &CrazyflieROS::setGroup, this);
 
     if (m_enableLogging) {
       for (auto& logBlock : m_logBlocks) {
@@ -291,7 +298,7 @@ public:
   {
     ROS_INFO("[%s] Takeoff", m_frame.c_str());
 
-    m_cf.takeoff(req.height, req.time_from_start.toSec() * 1000);
+    m_cf.takeoff(req.group, req.height, req.time_from_start.toSec() * 1000);
 
     return true;
   }
@@ -302,7 +309,7 @@ public:
   {
     ROS_INFO("[%s] Land", m_frame.c_str());
 
-    m_cf.land(req.height, req.time_from_start.toSec() * 1000);
+    m_cf.land(req.group, req.height, req.time_from_start.toSec() * 1000);
 
     return true;
   }
@@ -331,6 +338,16 @@ public:
     return true;
   }
 
+  bool setGroup(
+    crazyflie_driver::SetGroup::Request& req,
+    crazyflie_driver::SetGroup::Response& res)
+  {
+    ROS_INFO("[%s] Set Group", m_frame.c_str());
+
+    m_cf.setGroup(req.group);
+
+    return true;
+  }
 
   void run(
     ros::CallbackQueue& queue)
@@ -464,7 +481,7 @@ private:
   ros::ServiceServer m_serviceLand;
   ros::ServiceServer m_serviceHover;
   ros::ServiceServer m_serviceAvoidTarget;
-
+  ros::ServiceServer m_serviceSetGroup;
 
   std::vector<crazyflie_driver::LogBlock> m_logBlocks;
   std::vector<ros::Publisher> m_pubLogDataGeneric;
@@ -605,54 +622,60 @@ public:
   }
 
   void takeoff(
+    uint8_t group,
     double targetHeight,
     uint16_t time_in_ms)
   {
     // for (size_t i = 0; i < 10; ++i) {
-    m_cfbc.takeoff(targetHeight, time_in_ms);
+    m_cfbc.takeoff(group, targetHeight, time_in_ms);
       // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     // }
   }
 
   void land(
+    uint8_t group,
     double targetHeight,
     uint16_t time_in_ms)
   {
     // for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.land(targetHeight, time_in_ms);
+      m_cfbc.land(group, targetHeight, time_in_ms);
       // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     // }
   }
 
-  void startTrajectory()
+  void startTrajectory(
+    uint8_t group)
   {
     // for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.trajectoryStart();
+      m_cfbc.trajectoryStart(group);
       // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     // }
   }
 
-  void startEllipse()
+  void startEllipse(
+    uint8_t group)
   {
     // for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.ellipse();
+      m_cfbc.ellipse(group);
       // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     // }
   }
 
-  void goHome()
+  void goHome(
+    uint8_t group)
   {
     // for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.goHome();
+      m_cfbc.goHome(group);
       // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     // }
   }
 
   void startCannedTrajectory(
+    uint8_t group,
     uint16_t trajectory,
     float timescale)
   {
-      m_cfbc.startCannedTrajectory(trajectory, timescale);
+      m_cfbc.startCannedTrajectory(group, trajectory, timescale);
   }
 
 private:
@@ -1061,7 +1084,16 @@ public:
       // Get the latency
       float viconLatency = client.GetLatencyTotal().Total;
       if (viconLatency > 0.030) {
-        ROS_WARN("VICON Latency high: %f s.", viconLatency);
+        std::stringstream sstr;
+        sstr << "VICON Latency high: " << viconLatency << " s." << std::endl;
+        size_t latencyCount = client.GetLatencySampleCount().Count;
+        for(size_t i = 0; i < latencyCount; ++i) {
+          std::string sampleName  = client.GetLatencySampleName(i).Name;
+          double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
+          sstr << "  Latency: " << sampleName << ": " << sampleValue << " s." << std::endl;
+        }
+
+        ROS_WARN("%s", sstr.str().c_str());
       }
 
       // size_t latencyCount = client.GetLatencySampleCount().Count;
@@ -1166,7 +1198,7 @@ private:
 
     for (size_t i = 0; i < 10; ++i) {
       for (auto& group : m_groups) {
-        group->takeoff(req.height, req.time_from_start.toSec() * 1000);
+        group->takeoff(req.group, req.height, req.time_from_start.toSec() * 1000);
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -1182,7 +1214,7 @@ private:
 
     for (size_t i = 0; i < 10; ++i) {
       for (auto& group : m_groups) {
-        group->land(req.height, req.time_from_start.toSec() * 1000);
+        group->land(req.group, req.height, req.time_from_start.toSec() * 1000);
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -1191,14 +1223,14 @@ private:
   }
 
   bool startTrajectory(
-    std_srvs::Empty::Request& req,
-    std_srvs::Empty::Response& res)
+    crazyflie_driver::StartTrajectory::Request& req,
+    crazyflie_driver::StartTrajectory::Response& res)
   {
     ROS_INFO("Start trajectory!");
 
     for (size_t i = 0; i < 10; ++i) {
       for (auto& group : m_groups) {
-        group->startTrajectory();
+        group->startTrajectory(req.group);
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -1207,14 +1239,14 @@ private:
   }
 
   bool startEllipse(
-    std_srvs::Empty::Request& req,
-    std_srvs::Empty::Response& res)
+    crazyflie_driver::StartEllipse::Request& req,
+    crazyflie_driver::StartEllipse::Response& res)
   {
     ROS_INFO("Start Ellipse!");
 
     for (size_t i = 0; i < 10; ++i) {
       for (auto& group : m_groups) {
-        group->startEllipse();
+        group->startEllipse(req.group);
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -1223,14 +1255,14 @@ private:
   }
 
   bool goHome(
-    std_srvs::Empty::Request& req,
-    std_srvs::Empty::Response& res)
+    crazyflie_driver::GoHome::Request& req,
+    crazyflie_driver::GoHome::Response& res)
   {
     ROS_INFO("Go Home!");
 
     for (size_t i = 0; i < 10; ++i) {
       for (auto& group : m_groups) {
-        group->goHome();
+        group->goHome(req.group);
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -1246,7 +1278,7 @@ private:
 
     for (size_t i = 0; i < 10; ++i) {
       for (auto& group : m_groups) {
-        group->startCannedTrajectory(req.trajectory, req.timescale);
+        group->startCannedTrajectory(req.group, req.trajectory, req.timescale);
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }

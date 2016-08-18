@@ -42,14 +42,18 @@ find_package(PCL REQUIRED)
 add_service_files(
   FILES
   AddCrazyflie.srv
+  AvoidTarget.srv
+  GoHome.srv
+  Hover.srv
+  Land.srv
+  SetEllipse.srv
+  SetGroup.srv
+  StartCannedTrajectory.srv
+  StartEllipse.srv
+  StartTrajectory.srv
+  Takeoff.srv
   UpdateParams.srv
   UploadTrajectory.srv
-  SetEllipse.srv
-  Hover.srv
-  Takeoff.srv
-  Land.srv
-  StartCannedTrajectory.srv
-  AvoidTarget.srv
 )
 
 add_message_files(
