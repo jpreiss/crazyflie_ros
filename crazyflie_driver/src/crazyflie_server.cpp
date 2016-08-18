@@ -52,6 +52,8 @@
 
 #include <fstream>
 #include <future>
+#include <mutex>
+#include <wordexp.h> // tilde expansion
 
 /*
 Threading
@@ -81,6 +83,41 @@ double radToDeg(double rad) {
 void logWarn(const std::string& msg)
 {
   ROS_WARN("%s", msg.c_str());
+}
+
+// TODO this is incredibly dumb, fix it
+std::mutex viconClientMutex;
+
+static bool viconObjectAllMarkersVisible(
+  ViconDataStreamSDK::CPP::Client &client, std::string const &objName)
+{
+  std::lock_guard<std::mutex> guard(viconClientMutex);
+  using namespace ViconDataStreamSDK::CPP;
+  auto output = client.GetMarkerCount(objName);
+  if (output.Result != Result::Success) {
+    return false;
+  }
+  bool ok = true;
+  for (unsigned i = 0; i < output.MarkerCount; ++i) {
+    auto marker = client.GetMarkerName(objName, i);
+    if (marker.Result != Result::Success) {
+      ROS_INFO("GetMarkerName fail on marker %d", i);
+      return false;
+    }
+    auto position = client.GetMarkerGlobalTranslation(objName, marker.MarkerName);
+    if (position.Result != Result::Success) {
+      ROS_INFO("GetMarkerGlobalTranslation fail on marker %s",
+        std::string(marker.MarkerName).c_str());
+      return false;
+    }
+    if (position.Occluded) {
+      ROS_INFO("Interactive object marker %s occluded with z = %f",
+        std::string(marker.MarkerName).c_str(), position.Translation[2]);
+      ok = false;
+      // don't early return; we want to print messages for all occluded markers
+    }
+  }
+  return ok;
 }
 
 class CrazyflieROS
@@ -536,6 +573,43 @@ public:
     delete m_tracker;
   }
 
+  void runInteractiveObject(std::vector<stateExternalBringup> &states)
+  {
+    auto const position = m_pClient->GetSegmentGlobalTranslation(
+      m_interactiveObject, m_interactiveObject);
+
+    if (position.Result != ViconDataStreamSDK::CPP::Result::Success) {
+      ROS_INFO("Interactive object GetSegmentGlobalTranslation failed");
+      return;
+    }
+
+    if (position.Occluded) {
+      // ROS_INFO("Interactive object is occluded");
+      return;
+    }
+
+    // this is kind of a hack -- make sure the interactive object
+    // is not very close to the floor. this is an extra measure to avoid
+    // fitting the interactive object to idle Crazyflies on the floor.
+    // obviously this only works if the interactive object is expected
+    // to be elevated above the floor all the time.
+    if (position.Translation[2] < 100) {
+      ROS_INFO("Interactive object is too close to floor");
+      return;
+    }
+
+    // only publish the interactive object if all of its markers are visible.
+    // this avoids the issue of Vicon Tracker fitting the interactive object
+    // to other markers in the scene (i.e. Crazyflies)
+    // when the interactive object is not actually in the scene at all.
+    // (this will print its own ROS_INFO error messages on failure)
+    bool const allVisible = viconObjectAllMarkersVisible(*m_pClient, m_interactiveObject);
+    if (allVisible) {
+      // TODO get 0xFF from packetdef.h???
+      publishViconObject(m_interactiveObject, 0xFF, states);
+    }
+  }
+
   void runFast()
   {
     auto stamp = std::chrono::high_resolution_clock::now();
@@ -543,8 +617,7 @@ public:
     std::vector<stateExternalBringup> states;
 
     if (!m_interactiveObject.empty()) {
-      // TODO get 0xFF from packetdef.h???
-      publishViconObject(m_interactiveObject, 0xFF, states);
+      runInteractiveObject(states);
     }
 
     if (m_useViconTracker) {
@@ -607,10 +680,16 @@ public:
 
   void runSlow()
   {
+    ros::NodeHandle nl("~");
+    bool enableLogging;
+    nl.getParam("enable_logging", enableLogging);
+
     while(ros::ok() && !m_isEmergency) {
-      // if (m_cfs.size() == 1) {
-      //   m_cfs[0]->sendPing();
-      // }
+      if (enableLogging) {
+        for (const auto& cf : m_cfs) {
+          cf->sendPing();
+        }
+      }
       m_slowQueue.callAvailable(ros::WallDuration(0));
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -779,9 +858,16 @@ private:
       }
     }
 
+    ros::NodeHandle nl("~");
+    bool enableLogging;
+    bool enableParameters;
+
+    nl.getParam("enable_logging", enableLogging);
+    nl.getParam("enable_parameters", enableParameters);
+
     // add Crazyflies
     for (const auto& config : cfConfigs) {
-      addCrazyflie(config.uri, config.tf_prefix, config.frame, config.idNumber, logBlocks);
+      addCrazyflie(config.uri, config.tf_prefix, config.frame, "/world", enableParameters, enableLogging, config.idNumber, logBlocks);
 
       auto start = std::chrono::high_resolution_clock::now();
       updateParams(m_cfs.back());
@@ -795,6 +881,9 @@ private:
     const std::string& uri,
     const std::string& tf_prefix,
     const std::string& frame,
+    const std::string& worldFrame,
+    bool enableParameters,
+    bool enableLogging,
     int id,
     const std::vector<crazyflie_driver::LogBlock>& logBlocks)
   {
@@ -804,9 +893,9 @@ private:
       uri,
       tf_prefix,
       frame,
-      /*m_worldFrame*/ "/world",
-      /*enable_parameters*/ true,
-      /*enable_logging*/ false,
+      worldFrame,
+      enableParameters,
+      enableLogging,
       id,
       logBlocks,
       m_slowQueue
@@ -957,6 +1046,14 @@ public:
     nl.param<std::string>("save_point_clouds", logFilePath, "");
     nl.param<std::string>("interactive_object", interactiveObject, "");
 
+    // tilde-expansion
+    wordexp_t wordexp_result;
+    if (wordexp(logFilePath.c_str(), &wordexp_result, 0) == 0) {
+      // success - only read first result, could be more if globs were used
+      logFilePath = wordexp_result.we_wordv[0];
+    }
+    wordfree(&wordexp_result);
+
     libobjecttracker::PointCloudLogger pointCloudLogger(logFilePath);
     const bool logClouds = !logFilePath.empty();
 
@@ -1050,6 +1147,7 @@ public:
     } else {
       client.EnableUnlabeledMarkerData();
       if (!interactiveObject.empty()) {
+        client.EnableMarkerData();
         client.EnableSegmentData();
       }
     }
@@ -1083,7 +1181,7 @@ public:
 
       // Get the latency
       float viconLatency = client.GetLatencyTotal().Total;
-      if (viconLatency > 0.030) {
+      if (viconLatency > 0.035) {
         std::stringstream sstr;
         sstr << "VICON Latency high: " << viconLatency << " s." << std::endl;
         size_t latencyCount = client.GetLatencySampleCount().Count;
@@ -1145,7 +1243,7 @@ public:
       auto endIteration = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> elapsed = endIteration - startIteration;
       double elapsedSeconds = elapsed.count();
-      if (elapsedSeconds > 0.005) {
+      if (elapsedSeconds > 0.009) {
         ROS_WARN("Latency too high! Is %f s.", elapsedSeconds);
       }
 
@@ -1167,9 +1265,6 @@ public:
   void runSlow()
   {
     while(ros::ok() && !m_isEmergency) {
-      // if (m_cfs.size() == 1) {
-      //   m_cfs[0]->sendPing();
-      // }
       m_queue.callAvailable(ros::WallDuration(0));
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }

@@ -649,7 +649,7 @@ void Crazyflie::land(
   float targetHeight,
   uint16_t time_in_ms)
 {
-  crtpTrajectoryTakeoffRequest request(group, targetHeight, time_in_ms);
+  crtpTrajectoryLandRequest request(group, targetHeight, time_in_ms);
 
   startBatchRequest();
   addRequest(request, 2);

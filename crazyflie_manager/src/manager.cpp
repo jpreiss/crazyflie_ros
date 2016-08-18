@@ -127,7 +127,7 @@ private:
         crazyflie_driver::Land srv;
         srv.request.group = 0;
         srv.request.height = 0.06;
-        srv.request.time_from_start = ros::Duration(2.0);
+        srv.request.time_from_start = ros::Duration(3.5);
         m_serviceLand.call(srv);
     }
 
@@ -222,9 +222,9 @@ private:
         {
             ROS_ASSERT(crazyflies[i].getType() == XmlRpc::XmlRpcValue::TypeStruct);
             XmlRpc::XmlRpcValue crazyflie = crazyflies[i];
-            std::string id = crazyflie["id"];
+            int id = crazyflie["id"];
 
-            ros::service::call("cf" + id + "/upload_trajectory", srv);
+            ros::service::call("cf" + std::to_string(id) + "/upload_trajectory", srv);
         }
 
         ROS_INFO("All trajectories uploaded.");
