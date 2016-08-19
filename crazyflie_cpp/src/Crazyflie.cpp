@@ -600,9 +600,9 @@ void Crazyflie::sendPositionExternalBringup(
 {
   crtpPosExtBringup request;
   request.data.pose[0].id = data.id;
-  request.data.pose[0].x = position_float2fix(data.x);
-  request.data.pose[0].y = position_float2fix(data.y);
-  request.data.pose[0].z = position_float2fix(data.z);
+  request.data.pose[0].x = position_float_to_fix24(data.x);
+  request.data.pose[0].y = position_float_to_fix24(data.y);
+  request.data.pose[0].z = position_float_to_fix24(data.z);
   float q[4] = { data.q0, data.q1, data.q2, data.q3 };
   request.data.pose[0].quat = quatcompress(q);
   request.data.pose[1].id = 0;
@@ -616,15 +616,15 @@ void Crazyflie::setEllipse(
   float period)
 {
   crtpTrajectorySetEllipseRequest request;
-  request.data.centerx = position_float2fix(center.x);
-  request.data.centery = position_float2fix(center.y);
-  request.data.centerz = position_float2fix(center.z);
-  request.data.majorx = position_float2fix(major.x);
-  request.data.majory = position_float2fix(major.y);
-  request.data.majorz = position_float2fix(major.z);
-  request.data.minorx = position_float2fix(minor.x);
-  request.data.minory = position_float2fix(minor.y);
-  request.data.minorz = position_float2fix(minor.z);
+  request.data.centerx = position_float_to_fix16(center.x);
+  request.data.centery = position_float_to_fix16(center.y);
+  request.data.centerz = position_float_to_fix16(center.z);
+  request.data.majorx = position_float_to_fix16(major.x);
+  request.data.majory = position_float_to_fix16(major.y);
+  request.data.majorz = position_float_to_fix16(major.z);
+  request.data.minorx = position_float_to_fix16(minor.x);
+  request.data.minory = position_float_to_fix16(minor.y);
+  request.data.minorz = position_float_to_fix16(minor.z);
   request.data.period = period;
 
   startBatchRequest();
@@ -1106,9 +1106,9 @@ void CrazyflieBroadcaster::sendPositionExternalBringup(
   for (size_t i = 0; i < data.size(); ++i) {
     size_t j = i / 2;
     requests[j].data.pose[i%2].id = data[i].id;
-    requests[j].data.pose[i%2].x = position_float2fix(data[i].x);
-    requests[j].data.pose[i%2].y = position_float2fix(data[i].y);
-    requests[j].data.pose[i%2].z = position_float2fix(data[i].z);
+    requests[j].data.pose[i%2].x = position_float_to_fix24(data[i].x);
+    requests[j].data.pose[i%2].y = position_float_to_fix24(data[i].y);
+    requests[j].data.pose[i%2].z = position_float_to_fix24(data[i].z);
     float q[4] = { data[i].q0, data[i].q1, data[i].q2, data[i].q3 };
     requests[j].data.pose[i%2].quat = quatcompress(q);
   }
