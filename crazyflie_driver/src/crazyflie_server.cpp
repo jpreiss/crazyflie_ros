@@ -161,9 +161,15 @@ public:
     m_serviceSetGroup = n.advertiseService(tf_prefix + "/set_group", &CrazyflieROS::setGroup, this);
 
     if (m_enableLogging) {
+      m_logFile.open("logcf" + std::to_string(id) + ".csv");
+      m_logFile << "time,";
       for (auto& logBlock : m_logBlocks) {
         m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(tf_prefix + "/" + logBlock.topic_name, 10));
+        for (const auto& variableName : logBlock.variables) {
+          m_logFile << variableName << ",";
+        }
       }
+      m_logFile << std::endl;
     }
 
     // m_subscribeJoy = n.subscribe("/joy", 1, &CrazyflieROS::joyChanged, this);
@@ -174,6 +180,7 @@ public:
     m_logBlocks.clear();
     m_logBlocksGeneric.clear();
     m_cf.trySysOff();
+    m_logFile.close();
   }
 
   const std::string& frame() const {
@@ -499,6 +506,12 @@ public:
     msg.header.stamp = ros::Time(time_in_ms/1000.0);
     msg.values = *values;
 
+    m_logFile << time_in_ms / 1000.0 << ",";
+    for (const auto& value : *values) {
+      m_logFile << value << ",";
+    }
+    m_logFile << std::endl;
+
     pub->publish(msg);
   }
 
@@ -525,6 +538,8 @@ private:
   std::vector<std::unique_ptr<LogBlockGeneric> > m_logBlocksGeneric;
 
   ros::Subscriber m_subscribeJoy;
+
+  std::ofstream m_logFile;
 };
 
 
@@ -676,6 +691,13 @@ public:
       // totalLatency += elapsedSeconds.count();
       // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
     }
+
+    auto time = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    for (const auto& state : states) {
+      std::cout << time << "," << state.x << "," << state.y << "," << state.z << std::endl;
+    }
+
   }
 
   void runSlow()
