@@ -547,6 +547,12 @@ private:
 class CrazyflieGroup
 {
 public:
+  struct latency
+  {
+    double objectTracking;
+    double broadcasting;
+  };
+
   CrazyflieGroup(
     const std::vector<libobjecttracker::DynamicsConfiguration>& dynamicsConfigurations,
     const std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations,
@@ -586,6 +592,14 @@ public:
       delete cf;
     }
     delete m_tracker;
+  }
+
+  const latency& lastLatency() const {
+    return m_latency;
+  }
+
+  int radio() const {
+    return m_radio;
   }
 
   void runInteractiveObject(std::vector<stateExternalBringup> &states)
@@ -646,6 +660,7 @@ public:
         m_tracker->update(m_pMarkers);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsedSeconds = end-start;
+        m_latency.objectTracking = elapsedSeconds.count();
         // totalLatency += elapsedSeconds.count();
         // ROS_INFO("Tracking: %f s", elapsedSeconds.count());
       }
@@ -688,6 +703,7 @@ public:
       m_cfbc.sendPositionExternalBringup(states);
       auto end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> elapsedSeconds = end-start;
+      m_latency.broadcasting = elapsedSeconds.count();
       // totalLatency += elapsedSeconds.count();
       // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
     }
@@ -983,6 +999,7 @@ private:
   bool m_isEmergency;
   bool m_useViconTracker;
   tf::TransformBroadcaster m_br;
+  latency m_latency;
 };
 
 // handles all Crazyflies
@@ -1060,6 +1077,7 @@ public:
     bool useViconTracker;
     std::string logFilePath;
     std::string interactiveObject;
+    bool printLatency;
 
     ros::NodeHandle nl("~");
     nl.getParam("host_name", hostName);
@@ -1067,6 +1085,7 @@ public:
     nl.getParam("broadcast_address", broadcastAddress);
     nl.param<std::string>("save_point_clouds", logFilePath, "");
     nl.param<std::string>("interactive_object", interactiveObject, "");
+    nl.getParam("print_latency", printLatency);
 
     // tilde-expansion
     wordexp_t wordexp_result;
@@ -1193,10 +1212,17 @@ public:
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
+    struct latencyEntry {
+      std::string name;
+      double secs;
+    };
+    std::vector<latencyEntry> latencies;
+
     while (ros::ok() && !m_isEmergency) {
       // Get a frame
       while (client.GetFrame().Result != Result::Success) {
       }
+      latencies.clear();
 
       auto startIteration = std::chrono::high_resolution_clock::now();
       double totalLatency = 0;
@@ -1214,6 +1240,15 @@ public:
         }
 
         ROS_WARN("%s", sstr.str().c_str());
+      }
+
+      if (printLatency) {
+        size_t latencyCount = client.GetLatencySampleCount().Count;
+        for(size_t i = 0; i < latencyCount; ++i) {
+          std::string sampleName  = client.GetLatencySampleName(i).Name;
+          double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
+          latencies.push_back({sampleName, sampleValue});
+        }
       }
 
       // size_t latencyCount = client.GetLatencySampleCount().Count;
@@ -1252,6 +1287,7 @@ public:
         }
       }
 
+      auto startRunGroups = std::chrono::high_resolution_clock::now();
       std::vector<std::future<void> > handles;
       for (auto group : m_groups) {
         auto handle = std::async(std::launch::async, &CrazyflieGroup::runFast, group);
@@ -1261,12 +1297,31 @@ public:
       for (auto& handle : handles) {
         handle.wait();
       }
+      auto endRunGroups = std::chrono::high_resolution_clock::now();
+      if (printLatency) {
+        std::chrono::duration<double> elapsedRunGroups = endRunGroups - startRunGroups;
+        latencies.push_back({"Run All Groups", elapsedRunGroups.count()});
+        int groupId = 0;
+        for (auto group : m_groups) {
+          auto latency = group->lastLatency();
+          int radio = group->radio();
+          latencies.push_back({"Group " + std::to_string(radio) + " objectTracking", latency.objectTracking});
+          latencies.push_back({"Group " + std::to_string(radio) + " broadcasting", latency.broadcasting});
+        }
+      }
 
       auto endIteration = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> elapsed = endIteration - startIteration;
       double elapsedSeconds = elapsed.count();
       if (elapsedSeconds > 0.009) {
         ROS_WARN("Latency too high! Is %f s.", elapsedSeconds);
+      }
+
+      if (printLatency) {
+        std::cout << "Latencies" << std::endl;
+        for (auto& latency : latencies) {
+          std::cout << latency.name << ": " << latency.secs << " s" << std::endl;
+        }
       }
 
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
