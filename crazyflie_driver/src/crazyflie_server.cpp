@@ -708,11 +708,11 @@ public:
       // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
     }
 
-    auto time = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    for (const auto& state : states) {
-      std::cout << time << "," << state.x << "," << state.y << "," << state.z << std::endl;
-    }
+    // auto time = std::chrono::duration_cast<std::chrono::microseconds>(
+    //   std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    // for (const auto& state : states) {
+    //   std::cout << time << "," << state.x << "," << state.y << "," << state.z << std::endl;
+    // }
 
   }
 
@@ -1248,6 +1248,7 @@ public:
           std::string sampleName  = client.GetLatencySampleName(i).Name;
           double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
           latencies.push_back({sampleName, sampleValue});
+          totalLatency += sampleValue;
         }
       }
 
@@ -1301,6 +1302,7 @@ public:
       if (printLatency) {
         std::chrono::duration<double> elapsedRunGroups = endRunGroups - startRunGroups;
         latencies.push_back({"Run All Groups", elapsedRunGroups.count()});
+        totalLatency += elapsedRunGroups.count();
         int groupId = 0;
         for (auto group : m_groups) {
           auto latency = group->lastLatency();
@@ -1320,8 +1322,9 @@ public:
       if (printLatency) {
         std::cout << "Latencies" << std::endl;
         for (auto& latency : latencies) {
-          std::cout << latency.name << ": " << latency.secs << " s" << std::endl;
+          std::cout << latency.name << ": " << latency.secs * 1000 << " ms" << std::endl;
         }
+        std::cout << "Total " << totalLatency * 1000 << " ms" << std::endl;
       }
 
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
