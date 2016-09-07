@@ -119,6 +119,16 @@ target_link_libraries(version
   ${Boost_LIBRARIES}
 )
 
+### queryCtrlStats
+
+add_executable(queryCtrlStats
+  src/queryCtrlStats.cpp
+)
+target_link_libraries(queryCtrlStats
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
 #############
 ## Install ##
 #############
