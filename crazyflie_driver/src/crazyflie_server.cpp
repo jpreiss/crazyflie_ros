@@ -132,7 +132,8 @@ public:
     bool enable_logging,
     int id,
     const std::vector<crazyflie_driver::LogBlock>& log_blocks,
-    ros::CallbackQueue& queue)
+    ros::CallbackQueue& queue,
+    bool force_no_cache)
     : m_cf(link_uri)
     , m_tf_prefix(tf_prefix)
     , m_frame(frame)
@@ -149,6 +150,7 @@ public:
     , m_serviceAvoidTarget()
     , m_serviceSetGroup()
     , m_logBlocks(log_blocks)
+    , m_forceNoCache(force_no_cache)
   {
     ros::NodeHandle n;
     n.setCallbackQueue(&queue);
@@ -410,7 +412,7 @@ public:
     if (m_enableParameters)
     {
       ROS_INFO("[%s] Requesting parameters...", m_frame.c_str());
-      m_cf.requestParamToc();
+      m_cf.requestParamToc(m_forceNoCache);
       for (auto iter = m_cf.paramsBegin(); iter != m_cf.paramsEnd(); ++iter) {
         auto entry = *iter;
         std::string paramName = "/" + m_tf_prefix + "/" + entry.group + "/" + entry.name;
@@ -449,7 +451,7 @@ public:
     // Logging
     if (m_enableLogging) {
       ROS_INFO("[%s] Requesting logging variables...", m_frame.c_str());
-      m_cf.requestLogToc();
+      m_cf.requestLogToc(m_forceNoCache);
       auto end2 = std::chrono::system_clock::now();
       std::chrono::duration<double> elapsedSeconds2 = end2-end1;
       ROS_INFO("[%s] reqLogTOC: %f s", m_frame.c_str(), elapsedSeconds2.count());
@@ -540,6 +542,7 @@ private:
   ros::Subscriber m_subscribeJoy;
 
   std::ofstream m_logFile;
+  bool m_forceNoCache;
 };
 
 
@@ -697,9 +700,11 @@ public:
           m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", m_cfs[i]->frame()));
 
           if (m_outputCSVs.size() > 0) {
-            std::chrono::duration<double> tDuration = m_phaseStart - stamp;
+            std::chrono::duration<double> tDuration = stamp - m_phaseStart;
             double t = tDuration.count();
-            m_outputCSVs[i] << t << "," << states.back().x << "," << states.back().y << "," << states.back().z << "\n";
+            auto rpy = q.toRotationMatrix().eulerAngles(0, 1, 2);
+            m_outputCSVs[i] << t << "," << states.back().x << "," << states.back().y << "," << states.back().z
+                                 << "," << rpy(0) << "," << rpy(1) << "," << rpy(2) << "\n";
           }
         } else {
           std::chrono::duration<double> elapsedSeconds = stamp - m_tracker->objects()[i].lastValidTime();
@@ -720,11 +725,11 @@ public:
       // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
     }
 
-    auto time = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    for (const auto& state : states) {
-      std::cout << time << "," << state.x << "," << state.y << "," << state.z << std::endl;
-    }
+    // auto time = std::chrono::duration_cast<std::chrono::microseconds>(
+    //   std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    // for (const auto& state : states) {
+    //   std::cout << time << "," << state.x << "," << state.y << "," << state.z << std::endl;
+    // }
 
   }
 
@@ -809,13 +814,11 @@ public:
 
   void nextPhase()
   {
-      if (m_phase > 0) {
-        for (size_t i = 0; i < m_outputCSVs.size(); ++i) {
-          auto& file = m_outputCSVs[i];
-          file.close();
-          file.open("cf" + std::to_string(m_cfs[i]->id()) + "_phase" + std::to_string(m_phase) + ".csv");
-          file << "t,x,y,z,roll,pitch,yaw\n";
-        }
+      for (size_t i = 0; i < m_outputCSVs.size(); ++i) {
+        auto& file = m_outputCSVs[i];
+        file.close();
+        file.open("cf" + std::to_string(m_cfs[i]->id()) + "_phase" + std::to_string(m_phase + 1) + ".csv");
+        file << "t,x,y,z,roll,pitch,yaw\n";
       }
       m_phase += 1;
       m_phaseStart = std::chrono::system_clock::now();
@@ -925,13 +928,15 @@ private:
     ros::NodeHandle nl("~");
     bool enableLogging;
     bool enableParameters;
+    bool forceNoCache;
 
     nl.getParam("enable_logging", enableLogging);
     nl.getParam("enable_parameters", enableParameters);
+    nl.getParam("force_no_cache", forceNoCache);
 
     // add Crazyflies
     for (const auto& config : cfConfigs) {
-      addCrazyflie(config.uri, config.tf_prefix, config.frame, "/world", enableParameters, enableLogging, config.idNumber, logBlocks);
+      addCrazyflie(config.uri, config.tf_prefix, config.frame, "/world", enableParameters, enableLogging, config.idNumber, logBlocks, forceNoCache);
 
       auto start = std::chrono::high_resolution_clock::now();
       updateParams(m_cfs.back());
@@ -949,7 +954,8 @@ private:
     bool enableParameters,
     bool enableLogging,
     int id,
-    const std::vector<crazyflie_driver::LogBlock>& logBlocks)
+    const std::vector<crazyflie_driver::LogBlock>& logBlocks,
+    bool forceNoCache)
   {
     ROS_INFO("Adding CF: %s (%s, %s)...", tf_prefix.c_str(), uri.c_str(), frame.c_str());
     auto start = std::chrono::high_resolution_clock::now();
@@ -962,8 +968,8 @@ private:
       enableLogging,
       id,
       logBlocks,
-      m_slowQueue
-      );
+      m_slowQueue,
+      forceNoCache);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     ROS_INFO("CF ctor: %f s", elapsed.count());
@@ -1283,6 +1289,7 @@ public:
           std::string sampleName  = client.GetLatencySampleName(i).Name;
           double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
           latencies.push_back({sampleName, sampleValue});
+          totalLatency += sampleValue;
         }
       }
 
@@ -1336,6 +1343,7 @@ public:
       if (printLatency) {
         std::chrono::duration<double> elapsedRunGroups = endRunGroups - startRunGroups;
         latencies.push_back({"Run All Groups", elapsedRunGroups.count()});
+        totalLatency += elapsedRunGroups.count();
         int groupId = 0;
         for (auto group : m_groups) {
           auto latency = group->lastLatency();
@@ -1355,8 +1363,9 @@ public:
       if (printLatency) {
         std::cout << "Latencies" << std::endl;
         for (auto& latency : latencies) {
-          std::cout << latency.name << ": " << latency.secs << " s" << std::endl;
+          std::cout << latency.name << ": " << latency.secs * 1000 << " ms" << std::endl;
         }
+        std::cout << "Total " << totalLatency * 1000 << " ms" << std::endl;
       }
 
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
@@ -1497,7 +1506,7 @@ private:
     std_srvs::Empty::Request& req,
     std_srvs::Empty::Response& res)
   {
-    ROS_FATAL("NextPhase!");
+    ROS_INFO("NextPhase!");
     for (auto& group : m_groups) {
       group->nextPhase();
     }

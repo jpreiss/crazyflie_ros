@@ -106,9 +106,9 @@ public:
 
   void setChannel(uint8_t channel);
 
-  void requestLogToc();
+  void requestLogToc(bool forceNoCache=false);
 
-  void requestParamToc();
+  void requestParamToc(bool forceNoCache=false);
 
   std::vector<ParamTocEntry>::const_iterator paramsBegin() const {
     return m_paramTocEntries.begin();
