@@ -209,7 +209,7 @@ void Crazyflie::setChannel(uint8_t channel)
   sendPacketOrTimeout(setChannel, sizeof(setChannel));
 }
 
-void Crazyflie::requestLogToc()
+void Crazyflie::requestLogToc(bool forceNoCache)
 {
   // Find the number of log variables in TOC
   crtpLogGetInfoRequest infoRequest;
@@ -223,7 +223,7 @@ void Crazyflie::requestLogToc()
   std::string fileName = "log" + std::to_string(crc) + ".json";
   std::ifstream infile(fileName);
 
-  if (!infile.good()) {
+  if (forceNoCache || !infile.good()) {
     std::cout << "Log: " << len << std::endl;
 
     // Request detailed information
@@ -263,7 +263,7 @@ void Crazyflie::requestLogToc()
       write_json(output, root);
     }
   } else {
-    // std::cout << "Found variables in cache." << std::endl;
+    std::cout << "Found variables in cache." << std::endl;
 
     pt::ptree root;
     pt::read_json(fileName, root);
@@ -278,7 +278,7 @@ void Crazyflie::requestLogToc()
   }
 }
 
-void Crazyflie::requestParamToc()
+void Crazyflie::requestParamToc(bool forceNoCache)
 {
   // Find the number of parameters in TOC
   crtpParamTocGetInfoRequest infoRequest;
@@ -292,7 +292,7 @@ void Crazyflie::requestParamToc()
   std::string fileName = "params" + std::to_string(crc) + ".json";
   std::ifstream infile(fileName);
 
-  if (!infile.good()) {
+  if (forceNoCache || !infile.good()) {
     std::cout << "Params: " << len << std::endl;
 
     // Request detailed information and values
@@ -342,7 +342,7 @@ void Crazyflie::requestParamToc()
       write_json(output, root);
     }
   } else {
-    // std::cout << "Found variables in cache." << std::endl;
+    std::cout << "Found variables in cache." << std::endl;
 
     pt::ptree root;
     pt::read_json(fileName, root);

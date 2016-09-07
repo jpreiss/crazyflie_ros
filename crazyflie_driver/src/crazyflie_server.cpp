@@ -132,7 +132,8 @@ public:
     bool enable_logging,
     int id,
     const std::vector<crazyflie_driver::LogBlock>& log_blocks,
-    ros::CallbackQueue& queue)
+    ros::CallbackQueue& queue,
+    bool force_no_cache)
     : m_cf(link_uri)
     , m_tf_prefix(tf_prefix)
     , m_frame(frame)
@@ -149,6 +150,7 @@ public:
     , m_serviceAvoidTarget()
     , m_serviceSetGroup()
     , m_logBlocks(log_blocks)
+    , m_forceNoCache(force_no_cache)
   {
     ros::NodeHandle n;
     n.setCallbackQueue(&queue);
@@ -410,7 +412,7 @@ public:
     if (m_enableParameters)
     {
       ROS_INFO("[%s] Requesting parameters...", m_frame.c_str());
-      m_cf.requestParamToc();
+      m_cf.requestParamToc(m_forceNoCache);
       for (auto iter = m_cf.paramsBegin(); iter != m_cf.paramsEnd(); ++iter) {
         auto entry = *iter;
         std::string paramName = "/" + m_tf_prefix + "/" + entry.group + "/" + entry.name;
@@ -449,7 +451,7 @@ public:
     // Logging
     if (m_enableLogging) {
       ROS_INFO("[%s] Requesting logging variables...", m_frame.c_str());
-      m_cf.requestLogToc();
+      m_cf.requestLogToc(m_forceNoCache);
       auto end2 = std::chrono::system_clock::now();
       std::chrono::duration<double> elapsedSeconds2 = end2-end1;
       ROS_INFO("[%s] reqLogTOC: %f s", m_frame.c_str(), elapsedSeconds2.count());
@@ -540,6 +542,7 @@ private:
   ros::Subscriber m_subscribeJoy;
 
   std::ofstream m_logFile;
+  bool m_forceNoCache;
 };
 
 
@@ -563,7 +566,8 @@ public:
     const std::string broadcastAddress,
     bool useViconTracker,
     const std::vector<crazyflie_driver::LogBlock>& logBlocks,
-    std::string interactiveObject
+    std::string interactiveObject,
+    bool writeCSVs
     )
     : m_cfs()
     , m_tracker(nullptr)
@@ -576,6 +580,9 @@ public:
     , m_useViconTracker(useViconTracker)
     , m_br()
     , m_interactiveObject(interactiveObject)
+    , m_outputCSVs()
+    , m_phase(0)
+    , m_phaseStart()
   {
     std::vector<libobjecttracker::Object> objects;
     readObjects(objects, channel, logBlocks);
@@ -584,6 +591,9 @@ public:
       markerConfigurations,
       objects);
     m_tracker->setLogWarningCallback(logWarn);
+    if (writeCSVs) {
+      m_outputCSVs.resize(m_cfs.size());
+    }
   }
 
   ~CrazyflieGroup()
@@ -689,6 +699,13 @@ public:
           // tf::Quaternion tfq(q.x(), q.y(), q.z(), q.w());
           m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", m_cfs[i]->frame()));
 
+          if (m_outputCSVs.size() > 0) {
+            std::chrono::duration<double> tDuration = stamp - m_phaseStart;
+            double t = tDuration.count();
+            auto rpy = q.toRotationMatrix().eulerAngles(0, 1, 2);
+            m_outputCSVs[i] << t << "," << states.back().x << "," << states.back().y << "," << states.back().z
+                                 << "," << rpy(0) << "," << rpy(1) << "," << rpy(2) << "\n";
+          }
         } else {
           std::chrono::duration<double> elapsedSeconds = stamp - m_tracker->objects()[i].lastValidTime();
           ROS_WARN("No updated pose for CF %s for %f s.",
@@ -795,6 +812,18 @@ public:
       m_cfbc.startCannedTrajectory(group, trajectory, timescale);
   }
 
+  void nextPhase()
+  {
+      for (size_t i = 0; i < m_outputCSVs.size(); ++i) {
+        auto& file = m_outputCSVs[i];
+        file.close();
+        file.open("cf" + std::to_string(m_cfs[i]->id()) + "_phase" + std::to_string(m_phase + 1) + ".csv");
+        file << "t,x,y,z,roll,pitch,yaw\n";
+      }
+      m_phase += 1;
+      m_phaseStart = std::chrono::system_clock::now();
+  }
+
 private:
   void publishViconObject(const std::string& name, uint8_t id, std::vector<stateExternalBringup> &states)
   {
@@ -899,13 +928,15 @@ private:
     ros::NodeHandle nl("~");
     bool enableLogging;
     bool enableParameters;
+    bool forceNoCache;
 
     nl.getParam("enable_logging", enableLogging);
     nl.getParam("enable_parameters", enableParameters);
+    nl.getParam("force_no_cache", forceNoCache);
 
     // add Crazyflies
     for (const auto& config : cfConfigs) {
-      addCrazyflie(config.uri, config.tf_prefix, config.frame, "/world", enableParameters, enableLogging, config.idNumber, logBlocks);
+      addCrazyflie(config.uri, config.tf_prefix, config.frame, "/world", enableParameters, enableLogging, config.idNumber, logBlocks, forceNoCache);
 
       auto start = std::chrono::high_resolution_clock::now();
       updateParams(m_cfs.back());
@@ -923,7 +954,8 @@ private:
     bool enableParameters,
     bool enableLogging,
     int id,
-    const std::vector<crazyflie_driver::LogBlock>& logBlocks)
+    const std::vector<crazyflie_driver::LogBlock>& logBlocks,
+    bool forceNoCache)
   {
     ROS_INFO("Adding CF: %s (%s, %s)...", tf_prefix.c_str(), uri.c_str(), frame.c_str());
     auto start = std::chrono::high_resolution_clock::now();
@@ -936,8 +968,8 @@ private:
       enableLogging,
       id,
       logBlocks,
-      m_slowQueue
-      );
+      m_slowQueue,
+      forceNoCache);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     ROS_INFO("CF ctor: %f s", elapsed.count());
@@ -1000,6 +1032,9 @@ private:
   bool m_useViconTracker;
   tf::TransformBroadcaster m_br;
   latency m_latency;
+  std::vector<std::ofstream> m_outputCSVs;
+  int m_phase;
+  std::chrono::high_resolution_clock::time_point m_phaseStart;
 };
 
 // handles all Crazyflies
@@ -1015,6 +1050,7 @@ public:
     , m_serviceStartEllipse()
     , m_serviceGoHome()
     , m_serviceStartCannedTrajectory()
+    , m_serviceNextPhase()
   {
     ros::NodeHandle nh;
     nh.setCallbackQueue(&m_queue);
@@ -1026,6 +1062,8 @@ public:
     m_serviceStartEllipse = nh.advertiseService("start_ellipse", &CrazyflieServer::startEllipse, this);
     m_serviceGoHome = nh.advertiseService("go_home", &CrazyflieServer::goHome, this);
     m_serviceStartCannedTrajectory = nh.advertiseService("start_canned_trajectory", &CrazyflieServer::startCannedTrajectory, this);
+
+    m_serviceNextPhase = nh.advertiseService("next_phase", &CrazyflieServer::nextPhase, this);
 
     m_pubPointCloud = nh.advertise<sensor_msgs::PointCloud>("pointCloud", 1);
   }
@@ -1078,6 +1116,7 @@ public:
     std::string logFilePath;
     std::string interactiveObject;
     bool printLatency;
+    bool writeCSVs;
 
     ros::NodeHandle nl("~");
     nl.getParam("host_name", hostName);
@@ -1086,6 +1125,7 @@ public:
     nl.param<std::string>("save_point_clouds", logFilePath, "");
     nl.param<std::string>("interactive_object", interactiveObject, "");
     nl.getParam("print_latency", printLatency);
+    nl.getParam("write_csvs", writeCSVs);
 
     // tilde-expansion
     wordexp_t wordexp_result;
@@ -1149,7 +1189,8 @@ public:
                 broadcastAddress,
                 useViconTracker,
                 logBlocks,
-                interactiveObject);
+                interactiveObject,
+                writeCSVs);
             },
             channel,
             r
@@ -1461,6 +1502,18 @@ private:
     return true;
   }
 
+  bool nextPhase(
+    std_srvs::Empty::Request& req,
+    std_srvs::Empty::Response& res)
+  {
+    ROS_INFO("NextPhase!");
+    for (auto& group : m_groups) {
+      group->nextPhase();
+    }
+
+    return true;
+  }
+
 //
   void readMarkerConfigurations(
     std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations)
@@ -1541,6 +1594,7 @@ private:
   ros::ServiceServer m_serviceStartEllipse;
   ros::ServiceServer m_serviceGoHome;
   ros::ServiceServer m_serviceStartCannedTrajectory;
+  ros::ServiceServer m_serviceNextPhase;
 
   ros::Publisher m_pubPointCloud;
   // tf::TransformBroadcaster m_br;
