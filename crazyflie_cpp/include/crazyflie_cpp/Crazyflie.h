@@ -28,6 +28,19 @@ struct vec3 {
   float z;
 };
 
+class Logger
+{
+public:
+  Logger() {}
+  virtual ~Logger() {}
+
+  virtual void info(const std::string& msg) {}
+  virtual void warning(const std::string& msg) {}
+  virtual void error(const std::string& msg) {}
+};
+
+extern Logger EmptyLogger;
+
 class Crazyflie
 {
 public:
@@ -84,7 +97,8 @@ public:
 
 public:
   Crazyflie(
-    const std::string& link_uri);
+    const std::string& link_uri,
+    Logger& logger = EmptyLogger);
 
   void logReset();
 
@@ -363,6 +377,9 @@ private:
   };
   std::vector<batchRequest> m_batchRequests;
   size_t m_numRequestsFinished;
+
+  // logging
+  Logger& m_logger;
 };
 
 template<class T>

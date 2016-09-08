@@ -85,6 +85,34 @@ void logWarn(const std::string& msg)
   ROS_WARN("%s", msg.c_str());
 }
 
+class ROSLogger : public Logger
+{
+public:
+  ROSLogger()
+    : Logger()
+  {
+  }
+
+  virtual ~ROSLogger() {}
+
+  virtual void info(const std::string& msg)
+  {
+    ROS_INFO("%s", msg.c_str());
+  }
+
+  virtual void warning(const std::string& msg)
+  {
+    ROS_WARN("%s", msg.c_str());
+  }
+
+  virtual void error(const std::string& msg)
+  {
+    ROS_ERROR("%s", msg.c_str());
+  }
+};
+
+static ROSLogger rosLogger;
+
 // TODO this is incredibly dumb, fix it
 std::mutex viconClientMutex;
 
@@ -134,7 +162,7 @@ public:
     const std::vector<crazyflie_driver::LogBlock>& log_blocks,
     ros::CallbackQueue& queue,
     bool force_no_cache)
-    : m_cf(link_uri)
+    : m_cf(link_uri, rosLogger)
     , m_tf_prefix(tf_prefix)
     , m_frame(frame)
     , m_worldFrame(worldFrame)

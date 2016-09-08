@@ -30,9 +30,12 @@ std::mutex g_radioMutex[MAX_RADIOS];
 CrazyflieUSB* g_crazyflieUSB[MAX_USB];
 std::mutex g_crazyflieusbMutex[MAX_USB];
 
+Logger EmptyLogger;
+
 
 Crazyflie::Crazyflie(
-  const std::string& link_uri)
+  const std::string& link_uri,
+  Logger& logger)
   : m_radio(nullptr)
   , m_transport(nullptr)
   , m_devId(0)
@@ -46,6 +49,7 @@ Crazyflie::Crazyflie(
   , m_emptyAckCallback(nullptr)
   , m_linkQualityCallback(nullptr)
   , m_lastTrajectoryId(0)
+  , m_logger(logger)
 {
   int datarate;
   int channel;
@@ -224,7 +228,7 @@ void Crazyflie::requestLogToc(bool forceNoCache)
   std::ifstream infile(fileName);
 
   if (forceNoCache || !infile.good()) {
-    std::cout << "Log: " << len << std::endl;
+    m_logger.info("Log: " + std::to_string(len));
 
     // Request detailed information
     startBatchRequest();
@@ -263,7 +267,7 @@ void Crazyflie::requestLogToc(bool forceNoCache)
       write_json(output, root);
     }
   } else {
-    std::cout << "Found variables in cache." << std::endl;
+    m_logger.info("Found variables in cache.");
 
     pt::ptree root;
     pt::read_json(fileName, root);
@@ -293,7 +297,7 @@ void Crazyflie::requestParamToc(bool forceNoCache)
   std::ifstream infile(fileName);
 
   if (forceNoCache || !infile.good()) {
-    std::cout << "Params: " << len << std::endl;
+    m_logger.info("Params: " + std::to_string(len));
 
     // Request detailed information and values
     startBatchRequest();
@@ -342,7 +346,7 @@ void Crazyflie::requestParamToc(bool forceNoCache)
       write_json(output, root);
     }
   } else {
-    std::cout << "Found variables in cache." << std::endl;
+    m_logger.info("Found variables in cache.");
 
     pt::ptree root;
     pt::read_json(fileName, root);
@@ -472,24 +476,6 @@ void Crazyflie::trajectoryAdd(
 {
   crtpTrajectoryAddRequest request;
   request.data.id = m_lastTrajectoryId;
-
-  std::cout << duration << std::endl;
-  for (size_t i = 0; i < poly_x.size(); ++i) {
-    std::cout << poly_x[i] << ",";
-  }
-  std::cout << std::endl;
-  for (size_t i = 0; i < poly_y.size(); ++i) {
-    std::cout << poly_y[i] << ",";
-  }
-  std::cout << std::endl;
-  for (size_t i = 0; i < poly_z.size(); ++i) {
-    std::cout << poly_z[i] << ",";
-  }
-  std::cout << std::endl;
-  for (size_t i = 0; i < poly_yaw.size(); ++i) {
-    std::cout << poly_yaw[i] << ",";
-  }
-  std::cout << std::endl;
 
   startBatchRequest();
 
@@ -773,7 +759,7 @@ void Crazyflie::handleAck(
       iter->second(r, result.size - 5);
     }
     else {
-      std::cout << "Received unrequested data for block: " << (int)r->blockId << std::endl;
+      m_logger.warning("Received unrequested data for block: " + std::to_string((int)r->blockId));
     }
   }
   else if (crtpParamTocGetInfoResponse::match(result)) {
@@ -796,7 +782,9 @@ void Crazyflie::handleAck(
   }
   else {
     crtp* header = (crtp*)result.data;
-    std::cout << "Don't know ack: Port: " << (int)header->port << " Channel: " << (int)header->channel << " Len: " << (int)result.size << std::endl;
+    m_logger.warning("Don't know ack: Port: " + std::to_string((int)header->port)
+      + " Channel: " + std::to_string((int)header->channel)
+      + " Len: " + std::to_string((int)result.size));
     // for (size_t i = 1; i < result.size; ++i) {
     //   std::cout << "    " << (int)result.data[i] << std::endl;
     // }
