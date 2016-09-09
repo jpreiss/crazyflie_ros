@@ -1440,11 +1440,11 @@ private:
   {
     ROS_INFO("Takeoff!");
 
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
       for (auto& group : m_groups) {
         group->takeoff(req.group, req.height, req.time_from_start.toSec() * 1000);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
 
     return true;
@@ -1456,11 +1456,11 @@ private:
   {
     ROS_INFO("Land!");
 
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
       for (auto& group : m_groups) {
         group->land(req.group, req.height, req.time_from_start.toSec() * 1000);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
 
     return true;
@@ -1472,11 +1472,11 @@ private:
   {
     ROS_INFO("Start trajectory!");
 
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
       for (auto& group : m_groups) {
         group->startTrajectory(req.group);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
 
     return true;
@@ -1488,11 +1488,11 @@ private:
   {
     ROS_INFO("Start Ellipse!");
 
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
       for (auto& group : m_groups) {
         group->startEllipse(req.group);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
 
     return true;
@@ -1504,11 +1504,11 @@ private:
   {
     ROS_INFO("Go Home!");
 
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
       for (auto& group : m_groups) {
         group->goHome(req.group);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
 
     return true;
@@ -1520,11 +1520,11 @@ private:
   {
     ROS_INFO("StartCannedTrajectory!");
 
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
       for (auto& group : m_groups) {
         group->startCannedTrajectory(req.group, req.trajectory, req.timescale);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
 
     return true;
