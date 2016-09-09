@@ -1115,3 +1115,10 @@ void CrazyflieBroadcaster::sendPositionExternalBringup(
     }
   }
 }
+
+void CrazyflieBroadcaster::sendPacketDropTest(
+    uint64_t seq)
+{
+  crtpPacketDropTest request(seq);
+  sendPacket((const uint8_t*)&request, sizeof(request));
+}

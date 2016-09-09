@@ -668,6 +668,9 @@ public:
   void sendPositionExternalBringup(
     const std::vector<stateExternalBringup>& data);
 
+  void sendPacketDropTest(
+    uint64_t seq);
+
 protected:
   void sendPacket(
     const uint8_t* data,

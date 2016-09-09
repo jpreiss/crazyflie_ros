@@ -459,6 +459,19 @@ struct crtpPosExtBringup
 } __attribute__((packed));
 CHECKSIZE(crtpPosExtBringup)
 
+struct crtpPacketDropTest
+{
+  crtpPacketDropTest(uint64_t seq)
+    : header(11, 1)
+    {
+      data.seq = seq;
+    }
+
+    const crtp header;
+    struct data_packed_drops data;
+} __attribute__((packed));
+CHECKSIZE(crtpPacketDropTest)
+
 // Port 12 (PosExt)
 
 struct crtpPosExt

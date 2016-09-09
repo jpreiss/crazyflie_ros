@@ -6,26 +6,29 @@
 #include <crazyflie_cpp/Crazyflie.h>
 
 struct log {
-  float flighttime;
-  float error_dist;
-  float error_x;
-  float error_y;
-  float error_z;
+  float accx;
+  float accy;
+  float accz;
+  float gyrox;
+  float gyroy;
+  float gyroz;
 } __attribute__((packed));
 
 volatile bool g_done = false;
 
 void onLogData(uint32_t time_in_ms, struct log* data)
 {
-  if (data->flighttime > 0) {
-    std::cout << "total: " << data->error_dist / data->flighttime << std::endl;
-    std::cout << "x: " << data->error_x / data->flighttime << std::endl;
-    std::cout << "y: " << data->error_y / data->flighttime << std::endl;
-    std::cout << "z: " << data->error_z / data->flighttime << std::endl;
-  } else {
-    std::cout << "0" << std::endl;
+  static int count = 0;
+
+  std::cout << time_in_ms << ","
+            << data->accx << "," << data->accy << "," << data->accz << ","
+            << data->gyrox << "," << data->gyroy << "," << data->gyroz << std::endl;
+
+  ++count;
+  // std::cout << count << std::endl;
+  if (count > 1000) {
+    g_done = true;
   }
-  g_done = true;
 }
 
 int main(int argc, char **argv)
@@ -71,17 +74,21 @@ int main(int argc, char **argv)
 
     logBlock.reset(new LogBlock<struct log>(
       &cf,{
-        {"ctrlStat", "t"},
-        {"ctrlStat", "edist"},
-        {"ctrlStat", "ex"},
-        {"ctrlStat", "ey"},
-        {"ctrlStat", "ez"},
+        {"acc", "x"},
+        {"acc", "y"},
+        {"acc", "z"},
+        {"gyro", "x"},
+        {"gyro", "y"},
+        {"gyro", "z"}
       }, cb));
-    logBlock->start(10); // 100ms
+
+    std::cout << "t,accx,accy,accz,gyrox,gyroy,gyroz" << std::endl;
+
+    logBlock->start(1); // 10ms
 
     while (!g_done) {
       cf.sendPing();
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     return 0;

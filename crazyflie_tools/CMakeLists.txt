@@ -129,6 +129,36 @@ target_link_libraries(queryCtrlStats
   ${Boost_LIBRARIES}
 )
 
+### queryIMU
+
+add_executable(queryIMU
+  src/queryIMU.cpp
+)
+target_link_libraries(queryIMU
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
+### queryPacketDrops
+
+add_executable(queryPacketDrops
+  src/queryPacketDrops.cpp
+)
+target_link_libraries(queryPacketDrops
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
+### packetDropTest
+
+add_executable(packetDropTest
+  src/packetDropTest.cpp
+)
+target_link_libraries(packetDropTest
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
 #############
 ## Install ##
 #############
