@@ -1287,6 +1287,9 @@ public:
     };
     std::vector<latencyEntry> latencies;
 
+    std::vector<double> latencyTotal(6 + 3 * 2, 0.0);
+    uint32_t latencyCount = 0;
+
     while (ros::ok() && !m_isEmergency) {
       // Get a frame
       while (client.GetFrame().Result != Result::Success) {
@@ -1317,7 +1320,9 @@ public:
           std::string sampleName  = client.GetLatencySampleName(i).Name;
           double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
           latencies.push_back({sampleName, sampleValue});
+          latencyTotal[i] += sampleValue;
           totalLatency += sampleValue;
+          latencyTotal.back() += sampleValue;
         }
       }
 
@@ -1371,13 +1376,18 @@ public:
       if (printLatency) {
         std::chrono::duration<double> elapsedRunGroups = endRunGroups - startRunGroups;
         latencies.push_back({"Run All Groups", elapsedRunGroups.count()});
+        latencyTotal[4] += elapsedRunGroups.count();
         totalLatency += elapsedRunGroups.count();
+        latencyTotal.back() += elapsedRunGroups.count();
         int groupId = 0;
         for (auto group : m_groups) {
           auto latency = group->lastLatency();
           int radio = group->radio();
           latencies.push_back({"Group " + std::to_string(radio) + " objectTracking", latency.objectTracking});
           latencies.push_back({"Group " + std::to_string(radio) + " broadcasting", latency.broadcasting});
+          latencyTotal[5 + 2*groupId] += latency.objectTracking;
+          latencyTotal[6 + 2*groupId] += latency.broadcasting;
+          ++groupId;
         }
       }
 
@@ -1389,11 +1399,19 @@ public:
       }
 
       if (printLatency) {
+        ++latencyCount;
         std::cout << "Latencies" << std::endl;
         for (auto& latency : latencies) {
           std::cout << latency.name << ": " << latency.secs * 1000 << " ms" << std::endl;
         }
         std::cout << "Total " << totalLatency * 1000 << " ms" << std::endl;
+        // if (latencyCount % 100 == 0) {
+          std::cout << "Avg " << latencyCount << std::endl;
+          for (size_t i = 0; i < latencyTotal.size(); ++i) {
+            std::cout << latencyTotal[i] / latencyCount * 1000.0 << ",";
+          }
+          std::cout << std::endl;
+        // }
       }
 
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
