@@ -18,12 +18,16 @@ volatile bool g_done = false;
 void onLogData(uint32_t time_in_ms, struct log* data)
 {
   if (data->flighttime > 0) {
-    std::cout << "total: " << data->error_dist / data->flighttime << std::endl;
-    std::cout << "x: " << data->error_x / data->flighttime << std::endl;
-    std::cout << "y: " << data->error_y / data->flighttime << std::endl;
-    std::cout << "z: " << data->error_z / data->flighttime << std::endl;
+    std::cout <<  data->error_dist / data->flighttime  << ","
+              <<  data->error_x / data->flighttime << ","
+              <<  data->error_y / data->flighttime << ","
+              <<  data->error_z / data->flighttime << std::endl;
+    // std::cout << "total: " << data->error_dist / data->flighttime << std::endl;
+    // std::cout << "x: " << data->error_x / data->flighttime << std::endl;
+    // std::cout << "y: " << data->error_y / data->flighttime << std::endl;
+    // std::cout << "z: " << data->error_z / data->flighttime << std::endl;
   } else {
-    std::cout << "0" << std::endl;
+    std::cout << "0,0,0,0" << std::endl;
   }
   g_done = true;
 }
