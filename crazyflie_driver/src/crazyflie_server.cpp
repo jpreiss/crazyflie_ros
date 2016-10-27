@@ -1192,8 +1192,6 @@ public:
       ROS_ERROR("Cardinality of genericLogTopics and genericLogTopicFrequencies does not match!");
     }
 
-    // using namespace ViconDataStreamSDK::CPP;
-
     // Make a new client
     libmotioncapture::MotionCapture* mocap = new libmotioncapture::MotionCaptureVicon(hostName,
       /*enableObjects*/useViconTracker || !interactiveObject.empty(),
@@ -1255,29 +1253,6 @@ public:
     //   ros::spinOnce();
     // }
 
-    // Configure vicon
-    // if (useViconTracker) {
-    //   client.EnableSegmentData();
-    // } else {
-    //   client.EnableUnlabeledMarkerData();
-    //   if (!interactiveObject.empty()) {
-    //     client.EnableMarkerData();
-    //     client.EnableSegmentData();
-    //   }
-    // }
-
-    // This is the lowest latency option
-    // client.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ServerPush);
-
-    // // Set the global up axis
-    // client.SetAxisMapping(Direction::Forward,
-    //                       Direction::Left,
-    //                       Direction::Up); // Z-up
-
-    // Discover the version number
-    // Output_GetVersion version = client.GetVersion();
-    // ROS_INFO("VICON Version: %d.%d.%d", version.Major, version.Minor, version.Point);
-
     // setup messages
     sensor_msgs::PointCloud msgPointCloud;
     msgPointCloud.header.seq = 0;
@@ -1293,43 +1268,42 @@ public:
 
     std::vector<double> latencyTotal(6 + 3 * 2, 0.0);
     uint32_t latencyCount = 0;
+    std::vector<libmotioncapture::LatencyInfo> mocapLatency;
 
     while (ros::ok() && !m_isEmergency) {
       // Get a frame
       mocap->waitForNextFrame();
-      // while (client.GetFrame().Result != Result::Success) {
-      // }
+
       latencies.clear();
 
       auto startIteration = std::chrono::high_resolution_clock::now();
       double totalLatency = 0;
 
       // Get the latency
-      // float viconLatency = client.GetLatencyTotal().Total;
-      // if (viconLatency > 0.035) {
-      //   std::stringstream sstr;
-      //   sstr << "VICON Latency high: " << viconLatency << " s." << std::endl;
-      //   size_t latencyCount = client.GetLatencySampleCount().Count;
-      //   for(size_t i = 0; i < latencyCount; ++i) {
-      //     std::string sampleName  = client.GetLatencySampleName(i).Name;
-      //     double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
-      //     sstr << "  Latency: " << sampleName << ": " << sampleValue << " s." << std::endl;
-      //   }
+      mocap->getLatency(mocapLatency);
+      float viconLatency = 0;
+      for (const auto& item : mocapLatency) {
+        viconLatency += item.value();
+      }
+      if (viconLatency > 0.035) {
+        std::stringstream sstr;
+        sstr << "VICON Latency high: " << viconLatency << " s." << std::endl;
+        for (const auto& item : mocapLatency) {
+          sstr << "  Latency: " << item.name() << ": " << item.value() << " s." << std::endl;
+        }
+        ROS_WARN("%s", sstr.str().c_str());
+      }
 
-      //   ROS_WARN("%s", sstr.str().c_str());
-      // }
-
-      // if (printLatency) {
-      //   size_t latencyCount = client.GetLatencySampleCount().Count;
-      //   for(size_t i = 0; i < latencyCount; ++i) {
-      //     std::string sampleName  = client.GetLatencySampleName(i).Name;
-      //     double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
-      //     latencies.push_back({sampleName, sampleValue});
-      //     latencyTotal[i] += sampleValue;
-      //     totalLatency += sampleValue;
-      //     latencyTotal.back() += sampleValue;
-      //   }
-      // }
+      if (printLatency) {
+        size_t i = 0;
+        for (const auto& item : mocapLatency) {
+          latencies.push_back({item.name(), item.value()});
+          latencyTotal[i] += item.value();
+          totalLatency += item.value();
+          latencyTotal.back() += item.value();
+        }
+        ++i;
+      }
 
       // size_t latencyCount = client.GetLatencySampleCount().Count;
       // for(size_t i = 0; i < latencyCount; ++i) {
@@ -1342,8 +1316,6 @@ public:
       // Get the unlabeled markers and create point cloud
       if (!useViconTracker) {
         mocap->getPointCloud(markers);
-        // size_t count = client.GetUnlabeledMarkerCount().MarkerCount;
-        // markers->clear();
 
         msgPointCloud.header.seq += 1;
         msgPointCloud.header.stamp = ros::Time::now();
@@ -1354,19 +1326,6 @@ public:
           msgPointCloud.points[i].y = point.y;
           msgPointCloud.points[i].z = point.z;
         }
-
-        // for(size_t i = 0; i < count; ++i) {
-        //   Output_GetUnlabeledMarkerGlobalTranslation translation =
-        //     client.GetUnlabeledMarkerGlobalTranslation(i);
-        //   markers->push_back(pcl::PointXYZ(
-        //     translation.Translation[0] / 1000.0,
-        //     translation.Translation[1] / 1000.0,
-        //     translation.Translation[2] / 1000.0));
-
-        //   msgPointCloud.points[i].x = translation.Translation[0] / 1000.0;
-        //   msgPointCloud.points[i].y = translation.Translation[1] / 1000.0;
-        //   msgPointCloud.points[i].z = translation.Translation[2] / 1000.0;
-        // }
         m_pubPointCloud.publish(msgPointCloud);
 
         if (logClouds) {
