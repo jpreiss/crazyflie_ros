@@ -41,8 +41,8 @@
 #include <signal.h>
 #include <csignal> // or C++ style alternative
 
-// VICON
-#include "vicon_sdk/Client.h"
+// Motion Capture
+#include "libmotioncapture/vicon.h"
 
 // Object tracker
 #include <libobjecttracker/object_tracker.h>
@@ -112,6 +112,7 @@ public:
 static ROSLogger rosLogger;
 
 // TODO this is incredibly dumb, fix it
+/*
 std::mutex viconClientMutex;
 
 static bool viconObjectAllMarkersVisible(
@@ -145,6 +146,7 @@ static bool viconObjectAllMarkersVisible(
   }
   return ok;
 }
+*/
 
 class CrazyflieROS
 {
@@ -585,7 +587,6 @@ public:
   CrazyflieGroup(
     const std::vector<libobjecttracker::DynamicsConfiguration>& dynamicsConfigurations,
     const std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations,
-    ViconDataStreamSDK::CPP::Client* pClient,
     pcl::PointCloud<pcl::PointXYZ>::Ptr pMarkers,
     int radio,
     int channel,
@@ -598,7 +599,6 @@ public:
     : m_cfs()
     , m_tracker(nullptr)
     , m_radio(radio)
-    , m_pClient(pClient)
     , m_pMarkers(pMarkers)
     , m_slowQueue()
     , m_cfbc("radio://" + std::to_string(radio) + "/" + std::to_string(channel) + "/2M/" + broadcastAddress)
@@ -638,6 +638,7 @@ public:
     return m_radio;
   }
 
+/*
   void runInteractiveObject(std::vector<stateExternalBringup> &states)
   {
     auto const position = m_pClient->GetSegmentGlobalTranslation(
@@ -674,6 +675,7 @@ public:
       publishViconObject(m_interactiveObject, 0xFF, states);
     }
   }
+  */
 
   void runFast()
   {
@@ -681,14 +683,14 @@ public:
 
     std::vector<stateExternalBringup> states;
 
-    if (!m_interactiveObject.empty()) {
-      runInteractiveObject(states);
-    }
+    // if (!m_interactiveObject.empty()) {
+    //   runInteractiveObject(states);
+    // }
 
     if (m_useViconTracker) {
-      for (auto cf : m_cfs) {
-        publishViconObject(cf->frame(), cf->id(), states);
-      }
+      // for (auto cf : m_cfs) {
+      //   publishViconObject(cf->frame(), cf->id(), states);
+      // }
     } else {
       // run object tracker
       {
@@ -851,6 +853,7 @@ public:
   }
 
 private:
+  /*
   void publishViconObject(const std::string& name, uint8_t id, std::vector<stateExternalBringup> &states)
   {
     using namespace ViconDataStreamSDK::CPP;
@@ -889,6 +892,7 @@ private:
       ROS_WARN("No updated pose for Vicon object %s", name.c_str());
     }
   }
+  */
 
   void readObjects(
     std::vector<libobjecttracker::Object>& objects,
@@ -1050,7 +1054,7 @@ private:
   std::string m_interactiveObject;
   libobjecttracker::ObjectTracker* m_tracker;
   int m_radio;
-  ViconDataStreamSDK::CPP::Client* m_pClient;
+  // ViconDataStreamSDK::CPP::Client* m_pClient;
   pcl::PointCloud<pcl::PointXYZ>::Ptr m_pMarkers;
   ros::CallbackQueue m_slowQueue;
   CrazyflieBroadcaster m_cfbc;
@@ -1188,10 +1192,12 @@ public:
       ROS_ERROR("Cardinality of genericLogTopics and genericLogTopicFrequencies does not match!");
     }
 
-    using namespace ViconDataStreamSDK::CPP;
+    // using namespace ViconDataStreamSDK::CPP;
 
     // Make a new client
-    Client client;
+    libmotioncapture::MotionCapture* mocap = new libmotioncapture::MotionCaptureVicon(hostName,
+      /*enableObjects*/useViconTracker || !interactiveObject.empty(),
+      /*enablePointcloud*/ !useViconTracker);
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
 
@@ -1208,7 +1214,7 @@ public:
               return new CrazyflieGroup(
                 dynamicsConfigurations,
                 markerConfigurations,
-                &client,
+                // &client,
                 markers,
                 radio,
                 channel,
@@ -1239,38 +1245,38 @@ public:
     ROS_INFO("Started %lu threads", threads.size());
 
     // Connect to a server
-    ROS_INFO("Connecting to %s ...", hostName.c_str());
-    while (ros::ok() && !client.IsConnected().Connected) {
-      // Direct connection
-      bool ok = (client.Connect(hostName).Result == Result::Success);
-      if(!ok) {
-        ROS_WARN("Connect failed...");
-      }
-      ros::spinOnce();
-    }
+    // ROS_INFO("Connecting to %s ...", hostName.c_str());
+    // while (ros::ok() && !client.IsConnected().Connected) {
+    //   // Direct connection
+    //   bool ok = (client.Connect(hostName).Result == Result::Success);
+    //   if(!ok) {
+    //     ROS_WARN("Connect failed...");
+    //   }
+    //   ros::spinOnce();
+    // }
 
     // Configure vicon
-    if (useViconTracker) {
-      client.EnableSegmentData();
-    } else {
-      client.EnableUnlabeledMarkerData();
-      if (!interactiveObject.empty()) {
-        client.EnableMarkerData();
-        client.EnableSegmentData();
-      }
-    }
+    // if (useViconTracker) {
+    //   client.EnableSegmentData();
+    // } else {
+    //   client.EnableUnlabeledMarkerData();
+    //   if (!interactiveObject.empty()) {
+    //     client.EnableMarkerData();
+    //     client.EnableSegmentData();
+    //   }
+    // }
 
     // This is the lowest latency option
-    client.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ServerPush);
+    // client.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ServerPush);
 
-    // Set the global up axis
-    client.SetAxisMapping(Direction::Forward,
-                          Direction::Left,
-                          Direction::Up); // Z-up
+    // // Set the global up axis
+    // client.SetAxisMapping(Direction::Forward,
+    //                       Direction::Left,
+    //                       Direction::Up); // Z-up
 
     // Discover the version number
-    Output_GetVersion version = client.GetVersion();
-    ROS_INFO("VICON Version: %d.%d.%d", version.Major, version.Minor, version.Point);
+    // Output_GetVersion version = client.GetVersion();
+    // ROS_INFO("VICON Version: %d.%d.%d", version.Major, version.Minor, version.Point);
 
     // setup messages
     sensor_msgs::PointCloud msgPointCloud;
@@ -1290,39 +1296,40 @@ public:
 
     while (ros::ok() && !m_isEmergency) {
       // Get a frame
-      while (client.GetFrame().Result != Result::Success) {
-      }
+      mocap->waitForNextFrame();
+      // while (client.GetFrame().Result != Result::Success) {
+      // }
       latencies.clear();
 
       auto startIteration = std::chrono::high_resolution_clock::now();
       double totalLatency = 0;
 
       // Get the latency
-      float viconLatency = client.GetLatencyTotal().Total;
-      if (viconLatency > 0.035) {
-        std::stringstream sstr;
-        sstr << "VICON Latency high: " << viconLatency << " s." << std::endl;
-        size_t latencyCount = client.GetLatencySampleCount().Count;
-        for(size_t i = 0; i < latencyCount; ++i) {
-          std::string sampleName  = client.GetLatencySampleName(i).Name;
-          double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
-          sstr << "  Latency: " << sampleName << ": " << sampleValue << " s." << std::endl;
-        }
+      // float viconLatency = client.GetLatencyTotal().Total;
+      // if (viconLatency > 0.035) {
+      //   std::stringstream sstr;
+      //   sstr << "VICON Latency high: " << viconLatency << " s." << std::endl;
+      //   size_t latencyCount = client.GetLatencySampleCount().Count;
+      //   for(size_t i = 0; i < latencyCount; ++i) {
+      //     std::string sampleName  = client.GetLatencySampleName(i).Name;
+      //     double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
+      //     sstr << "  Latency: " << sampleName << ": " << sampleValue << " s." << std::endl;
+      //   }
 
-        ROS_WARN("%s", sstr.str().c_str());
-      }
+      //   ROS_WARN("%s", sstr.str().c_str());
+      // }
 
-      if (printLatency) {
-        size_t latencyCount = client.GetLatencySampleCount().Count;
-        for(size_t i = 0; i < latencyCount; ++i) {
-          std::string sampleName  = client.GetLatencySampleName(i).Name;
-          double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
-          latencies.push_back({sampleName, sampleValue});
-          latencyTotal[i] += sampleValue;
-          totalLatency += sampleValue;
-          latencyTotal.back() += sampleValue;
-        }
-      }
+      // if (printLatency) {
+      //   size_t latencyCount = client.GetLatencySampleCount().Count;
+      //   for(size_t i = 0; i < latencyCount; ++i) {
+      //     std::string sampleName  = client.GetLatencySampleName(i).Name;
+      //     double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
+      //     latencies.push_back({sampleName, sampleValue});
+      //     latencyTotal[i] += sampleValue;
+      //     totalLatency += sampleValue;
+      //     latencyTotal.back() += sampleValue;
+      //   }
+      // }
 
       // size_t latencyCount = client.GetLatencySampleCount().Count;
       // for(size_t i = 0; i < latencyCount; ++i) {
@@ -1334,25 +1341,32 @@ public:
 
       // Get the unlabeled markers and create point cloud
       if (!useViconTracker) {
-        size_t count = client.GetUnlabeledMarkerCount().MarkerCount;
-        markers->clear();
+        mocap->getPointCloud(markers);
+        // size_t count = client.GetUnlabeledMarkerCount().MarkerCount;
+        // markers->clear();
 
         msgPointCloud.header.seq += 1;
         msgPointCloud.header.stamp = ros::Time::now();
-        msgPointCloud.points.resize(count);
-
-        for(size_t i = 0; i < count; ++i) {
-          Output_GetUnlabeledMarkerGlobalTranslation translation =
-            client.GetUnlabeledMarkerGlobalTranslation(i);
-          markers->push_back(pcl::PointXYZ(
-            translation.Translation[0] / 1000.0,
-            translation.Translation[1] / 1000.0,
-            translation.Translation[2] / 1000.0));
-
-          msgPointCloud.points[i].x = translation.Translation[0] / 1000.0;
-          msgPointCloud.points[i].y = translation.Translation[1] / 1000.0;
-          msgPointCloud.points[i].z = translation.Translation[2] / 1000.0;
+        msgPointCloud.points.resize(markers->size());
+        for (size_t i = 0; i < markers->size(); ++i) {
+          const pcl::PointXYZ& point = markers->at(i);
+          msgPointCloud.points[i].x = point.x;
+          msgPointCloud.points[i].y = point.y;
+          msgPointCloud.points[i].z = point.z;
         }
+
+        // for(size_t i = 0; i < count; ++i) {
+        //   Output_GetUnlabeledMarkerGlobalTranslation translation =
+        //     client.GetUnlabeledMarkerGlobalTranslation(i);
+        //   markers->push_back(pcl::PointXYZ(
+        //     translation.Translation[0] / 1000.0,
+        //     translation.Translation[1] / 1000.0,
+        //     translation.Translation[2] / 1000.0));
+
+        //   msgPointCloud.points[i].x = translation.Translation[0] / 1000.0;
+        //   msgPointCloud.points[i].y = translation.Translation[1] / 1000.0;
+        //   msgPointCloud.points[i].z = translation.Translation[2] / 1000.0;
+        // }
         m_pubPointCloud.publish(msgPointCloud);
 
         if (logClouds) {

@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   crazyflie_cpp
   libobjecttracker
+  libmotioncapture
   tf_conversions
 )
 
@@ -100,7 +101,6 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
   # ${libobjecttracker_INCLUDE_DIRS}
   ../externalDependencies/libobjecttracker/include
-  ${VICON_SDK_DIR}/include
   ## YOU HAVE TO CHANGE THIS TO REACH THE CRAZYFLIE FIRMWARE ON YOUR MACHINE
   ../../../../crazyflie-firmware/src/modules/interface/
 )
@@ -127,7 +127,6 @@ target_link_libraries(crazyflie_server
   ${catkin_LIBRARIES}
   # ${libobjecttracker_LIBRARIES}
   # ${libobjecttracker_LIBRARIES}
-  ViconDataStreamSDK_CPP
 )
 
 ## Declare a cpp executable
