@@ -30,8 +30,6 @@
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/PointCloud.h>
 
-#include "vicon_ros/NamedPoseArray.h"
-
 //#include <regex>
 #include <thread>
 #include <mutex>
