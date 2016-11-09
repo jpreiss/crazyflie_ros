@@ -9,7 +9,6 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
   crazyflie_cpp
-  vicon_ros
   libobjecttracker
   tf_conversions
 )
