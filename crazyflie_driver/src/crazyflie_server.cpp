@@ -43,6 +43,7 @@
 
 // Motion Capture
 #include "libmotioncapture/vicon.h"
+#include "libmotioncapture/optitrack.h"
 
 // Object tracker
 #include <libobjecttracker/object_tracker.h>
@@ -1140,22 +1141,22 @@ public:
     readDynamicsConfigurations(dynamicsConfigurations);
     readChannels(channels);
 
-    std::string hostName;
     std::string broadcastAddress;
     bool useViconTracker;
     std::string logFilePath;
     std::string interactiveObject;
     bool printLatency;
     bool writeCSVs;
+    std::string motionCaptureType;
 
     ros::NodeHandle nl("~");
-    nl.getParam("host_name", hostName);
     nl.getParam("use_vicon_tracker", useViconTracker);
     nl.getParam("broadcast_address", broadcastAddress);
     nl.param<std::string>("save_point_clouds", logFilePath, "");
     nl.param<std::string>("interactive_object", interactiveObject, "");
     nl.getParam("print_latency", printLatency);
     nl.getParam("write_csvs", writeCSVs);
+    nl.param<std::string>("motion_capture_type", motionCaptureType, "vicon");
 
     // tilde-expansion
     wordexp_t wordexp_result;
@@ -1193,9 +1194,24 @@ public:
     }
 
     // Make a new client
-    libmotioncapture::MotionCapture* mocap = new libmotioncapture::MotionCaptureVicon(hostName,
-      /*enableObjects*/useViconTracker || !interactiveObject.empty(),
-      /*enablePointcloud*/ !useViconTracker);
+    libmotioncapture::MotionCapture* mocap = nullptr;
+    if (motionCaptureType == "vicon")
+    {
+      std::string hostName;
+      nl.getParam("vicon_host_name", hostName);
+      mocap = new libmotioncapture::MotionCaptureVicon(hostName,
+        /*enableObjects*/useViconTracker || !interactiveObject.empty(),
+        /*enablePointcloud*/ !useViconTracker);
+    } else if (motionCaptureType == "optitrack")
+    {
+      std::string localIP;
+      std::string serverIP;
+      nl.getParam("optitrack_local_ip", localIP);
+      nl.getParam("optitrack_server_ip", serverIP);
+      mocap = new libmotioncapture::MotionCaptureOptitrack(localIP, serverIP);
+    } else {
+      throw std::runtime_error("Unknown motion capture type!");
+    }
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
 
