@@ -589,10 +589,11 @@ public:
     const std::vector<libobjecttracker::DynamicsConfiguration>& dynamicsConfigurations,
     const std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations,
     pcl::PointCloud<pcl::PointXYZ>::Ptr pMarkers,
+    std::vector<libmotioncapture::Object>* pMocapObjects,
     int radio,
     int channel,
     const std::string broadcastAddress,
-    bool useViconTracker,
+    bool useMotionCaptureObjectTracking,
     const std::vector<crazyflie_driver::LogBlock>& logBlocks,
     std::string interactiveObject,
     bool writeCSVs
@@ -601,10 +602,11 @@ public:
     , m_tracker(nullptr)
     , m_radio(radio)
     , m_pMarkers(pMarkers)
+    , m_pMocapObjects(pMocapObjects)
     , m_slowQueue()
     , m_cfbc("radio://" + std::to_string(radio) + "/" + std::to_string(channel) + "/2M/" + broadcastAddress)
     , m_isEmergency(false)
-    , m_useViconTracker(useViconTracker)
+    , m_useMotionCaptureObjectTracking(useMotionCaptureObjectTracking)
     , m_br()
     , m_interactiveObject(interactiveObject)
     , m_outputCSVs()
@@ -688,10 +690,10 @@ public:
     //   runInteractiveObject(states);
     // }
 
-    if (m_useViconTracker) {
-      // for (auto cf : m_cfs) {
-      //   publishViconObject(cf->frame(), cf->id(), states);
-      // }
+    if (m_useMotionCaptureObjectTracking) {
+      for (auto cf : m_cfs) {
+        publishRigidBody(cf->frame(), cf->id(), states);
+      }
     } else {
       // run object tracker
       {
@@ -854,46 +856,46 @@ public:
   }
 
 private:
-  /*
-  void publishViconObject(const std::string& name, uint8_t id, std::vector<stateExternalBringup> &states)
+
+  void publishRigidBody(const std::string& name, uint8_t id, std::vector<stateExternalBringup> &states)
   {
-    using namespace ViconDataStreamSDK::CPP;
+    bool found = false;
+    for (const auto& rigidBody : *m_pMocapObjects) {
+      if (rigidBody.name() == name) {
 
-    Output_GetSegmentGlobalTranslation translation = m_pClient->GetSegmentGlobalTranslation(name, name);
-    Output_GetSegmentGlobalRotationQuaternion quaternion = m_pClient->GetSegmentGlobalRotationQuaternion(name, name);
+        states.resize(states.size() + 1);
+        states.back().id = id;
+        states.back().x = rigidBody.position().x();
+        states.back().y = rigidBody.position().y();
+        states.back().z = rigidBody.position().z();
+        states.back().q0 = rigidBody.rotation().x();
+        states.back().q1 = rigidBody.rotation().y();
+        states.back().q2 = rigidBody.rotation().z();
+        states.back().q3 = rigidBody.rotation().w();
 
-    if (   translation.Result == Result::Success
-        && quaternion.Result == Result::Success
-        && !translation.Occluded
-        && !quaternion.Occluded) {
+        tf::Transform transform;
+        transform.setOrigin(tf::Vector3(
+          states.back().x,
+          states.back().y,
+          states.back().z));
+        tf::Quaternion q(
+          states.back().q0,
+          states.back().q1,
+          states.back().q2,
+          states.back().q3);
+        transform.setRotation(q);
+        m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", name));
+        found = true;
+        break;
+      }
 
-      states.resize(states.size() + 1);
-      states.back().id = id;
-      states.back().x = translation.Translation[0] / 1000.0;
-      states.back().y = translation.Translation[1] / 1000.0;
-      states.back().z = translation.Translation[2] / 1000.0;
-      states.back().q0 = quaternion.Rotation[0];
-      states.back().q1 = quaternion.Rotation[1];
-      states.back().q2 = quaternion.Rotation[2];
-      states.back().q3 = quaternion.Rotation[3];
+    }
 
-      tf::Transform transform;
-      transform.setOrigin(tf::Vector3(
-        translation.Translation[0] / 1000.0,
-        translation.Translation[1] / 1000.0,
-        translation.Translation[2] / 1000.0));
-      tf::Quaternion q(
-        quaternion.Rotation[0],
-        quaternion.Rotation[1],
-        quaternion.Rotation[2],
-        quaternion.Rotation[3]);
-      transform.setRotation(q);
-      m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", name));
-    } else {
-      ROS_WARN("No updated pose for Vicon object %s", name.c_str());
+    if (!found) {
+      ROS_WARN("No updated pose for motion capture object %s", name.c_str());
     }
   }
-  */
+
 
   void readObjects(
     std::vector<libobjecttracker::Object>& objects,
@@ -1057,10 +1059,11 @@ private:
   int m_radio;
   // ViconDataStreamSDK::CPP::Client* m_pClient;
   pcl::PointCloud<pcl::PointXYZ>::Ptr m_pMarkers;
+  std::vector<libmotioncapture::Object>* m_pMocapObjects;
   ros::CallbackQueue m_slowQueue;
   CrazyflieBroadcaster m_cfbc;
   bool m_isEmergency;
-  bool m_useViconTracker;
+  bool m_useMotionCaptureObjectTracking;
   tf::TransformBroadcaster m_br;
   latency m_latency;
   std::vector<std::ofstream> m_outputCSVs;
@@ -1142,7 +1145,7 @@ public:
     readChannels(channels);
 
     std::string broadcastAddress;
-    bool useViconTracker;
+    bool useMotionCaptureObjectTracking;
     std::string logFilePath;
     std::string interactiveObject;
     bool printLatency;
@@ -1150,7 +1153,9 @@ public:
     std::string motionCaptureType;
 
     ros::NodeHandle nl("~");
-    nl.getParam("use_vicon_tracker", useViconTracker);
+    std::string objectTrackingType;
+    nl.getParam("object_tracking_type", objectTrackingType);
+    useMotionCaptureObjectTracking = (objectTrackingType == "motionCapture");
     nl.getParam("broadcast_address", broadcastAddress);
     nl.param<std::string>("save_point_clouds", logFilePath, "");
     nl.param<std::string>("interactive_object", interactiveObject, "");
@@ -1200,8 +1205,8 @@ public:
       std::string hostName;
       nl.getParam("vicon_host_name", hostName);
       mocap = new libmotioncapture::MotionCaptureVicon(hostName,
-        /*enableObjects*/useViconTracker || !interactiveObject.empty(),
-        /*enablePointcloud*/ !useViconTracker);
+        /*enableObjects*/useMotionCaptureObjectTracking || !interactiveObject.empty(),
+        /*enablePointcloud*/ !useMotionCaptureObjectTracking);
     } else if (motionCaptureType == "optitrack")
     {
       std::string localIP;
@@ -1214,6 +1219,7 @@ public:
     }
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
+    std::vector<libmotioncapture::Object> mocapObjects;
 
     // Create all groups in parallel and launch threads
     {
@@ -1230,10 +1236,11 @@ public:
                 markerConfigurations,
                 // &client,
                 markers,
+                &mocapObjects,
                 radio,
                 channel,
                 broadcastAddress,
-                useViconTracker,
+                useMotionCaptureObjectTracking,
                 logBlocks,
                 interactiveObject,
                 writeCSVs);
@@ -1330,7 +1337,7 @@ public:
       // }
 
       // Get the unlabeled markers and create point cloud
-      if (!useViconTracker) {
+      if (!useMotionCaptureObjectTracking) {
         mocap->getPointCloud(markers);
 
         msgPointCloud.header.seq += 1;
@@ -1347,6 +1354,10 @@ public:
         if (logClouds) {
           pointCloudLogger.log(markers);
         }
+      } else {
+        // get mocap rigid bodies
+        mocapObjects.clear();
+        mocap->getObjects(mocapObjects);
       }
 
       auto startRunGroups = std::chrono::high_resolution_clock::now();
