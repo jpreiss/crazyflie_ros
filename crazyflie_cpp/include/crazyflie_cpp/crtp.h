@@ -192,7 +192,8 @@ struct crtpParamWriteBroadcastRequest
     uint8_t group,
     uint8_t id,
     const T& value)
-    : header(3, 1)
+    : header(2, 3)
+    , command(1)
     , group(group)
     , id(id)
     , value(value)
@@ -200,6 +201,7 @@ struct crtpParamWriteBroadcastRequest
     }
 
     const crtp header;
+    const uint8_t command;
     const uint8_t group;
     const uint8_t id;
     const T value;
