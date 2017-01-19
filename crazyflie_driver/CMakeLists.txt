@@ -18,8 +18,6 @@ find_package(catkin REQUIRED COMPONENTS
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 #SET(CMAKE_CXX_COMPILER             "gcc-4.9")
 
-set(VICON_SDK_DIR ../externalDependencies/libmotioncapture/externalDependencies/vicon_sdk/)
-
 # SET(CMAKE_BUILD_TYPE "Debug")
 
 ## System dependencies are found with CMake's conventions
@@ -106,8 +104,18 @@ include_directories(
 )
 
 link_directories(
-  ${VICON_SDK_DIR}/lib64
+  ${LIBMOTIONCAPTURE_LINK_DIR}
 )
+
+if (ENABLE_VICON)
+  add_definitions(-DENABLE_VICON)
+endif()
+if (ENABLE_OPTITRACK)
+  add_definitions(-DENABLE_OPTITRACK)
+endif()
+if (ENABLE_PHASESPACE)
+  add_definitions(-DENABLE_PHASESPACE)
+endif()
 
 # message(${CMAKE_BINARY_DIR}/crazyflie_ros/externalDependencies/libobjecttracker)
 

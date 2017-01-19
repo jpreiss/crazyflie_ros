@@ -42,8 +42,15 @@
 #include <csignal> // or C++ style alternative
 
 // Motion Capture
+#ifdef ENABLE_VICON
 #include "libmotioncapture/vicon.h"
+#endif
+#ifdef ENABLE_OPTITRACK
 #include "libmotioncapture/optitrack.h"
+#endif
+#ifdef ENABLE_PHASESPACE
+#include "libmotioncapture/phasespace.h"
+#endif
 
 // Object tracker
 #include <libobjecttracker/object_tracker.h>
@@ -1200,21 +1207,42 @@ public:
 
     // Make a new client
     libmotioncapture::MotionCapture* mocap = nullptr;
-    if (motionCaptureType == "vicon")
+    if (false)
+    {
+    }
+#ifdef ENABLE_VICON
+    else if (motionCaptureType == "vicon")
     {
       std::string hostName;
       nl.getParam("vicon_host_name", hostName);
       mocap = new libmotioncapture::MotionCaptureVicon(hostName,
         /*enableObjects*/useMotionCaptureObjectTracking || !interactiveObject.empty(),
         /*enablePointcloud*/ !useMotionCaptureObjectTracking);
-    } else if (motionCaptureType == "optitrack")
+    }
+#endif
+#ifdef ENABLE_OPTITRACK
+    else if (motionCaptureType == "optitrack")
     {
       std::string localIP;
       std::string serverIP;
       nl.getParam("optitrack_local_ip", localIP);
       nl.getParam("optitrack_server_ip", serverIP);
       mocap = new libmotioncapture::MotionCaptureOptitrack(localIP, serverIP);
-    } else {
+    }
+#endif
+#ifdef ENABLE_PHASESPACE
+    else if (motionCaptureType == "phasespace")
+    {
+      std::string ip;
+      int numMarkers;
+      nl.getParam("phasespace_ip", ip);
+      nl.getParam("phasespace_num_markers", numMarkers);
+      std::map<size_t, std::pair<int, int> > cfs;
+      cfs[231] = std::make_pair<int, int>(10, 11);
+      mocap = new libmotioncapture::MotionCapturePhasespace(ip, numMarkers, cfs);
+    }
+#endif
+    else {
       throw std::runtime_error("Unknown motion capture type!");
     }
 
