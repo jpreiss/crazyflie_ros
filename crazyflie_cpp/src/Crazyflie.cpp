@@ -1122,3 +1122,56 @@ void CrazyflieBroadcaster::sendPacketDropTest(
   crtpPacketDropTest request(seq);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
+
+void CrazyflieBroadcaster::setParam(
+  uint8_t group,
+  uint8_t id,
+  Crazyflie::ParamType type,
+  const Crazyflie::ParamValue& value) {
+
+  switch (type) {
+    case Crazyflie::ParamTypeUint8:
+      {
+        crtpParamWriteBroadcastRequest<uint8_t> request(group, id, value.valueUint8);
+        sendPacket((const uint8_t*)&request, sizeof(request));
+        break;
+      }
+    case Crazyflie::ParamTypeInt8:
+      {
+        crtpParamWriteBroadcastRequest<int8_t> request(group, id, value.valueInt8);
+        sendPacket((const uint8_t*)&request, sizeof(request));
+        break;
+      }
+    case Crazyflie::ParamTypeUint16:
+      {
+        crtpParamWriteBroadcastRequest<uint16_t> request(group, id, value.valueUint16);
+        sendPacket((const uint8_t*)&request, sizeof(request));
+        break;
+      }
+    case Crazyflie::ParamTypeInt16:
+      {
+        crtpParamWriteBroadcastRequest<int16_t> request(group, id, value.valueInt16);
+        sendPacket((const uint8_t*)&request, sizeof(request));
+        break;
+      }
+    case Crazyflie::ParamTypeUint32:
+      {
+        crtpParamWriteBroadcastRequest<uint32_t> request(group, id, value.valueUint32);
+        sendPacket((const uint8_t*)&request, sizeof(request));
+        break;
+      }
+    case Crazyflie::ParamTypeInt32:
+      {
+        crtpParamWriteBroadcastRequest<int32_t> request(group, id, value.valueInt32);
+        sendPacket((const uint8_t*)&request, sizeof(request));
+        break;
+      }
+    case Crazyflie::ParamTypeFloat:
+      {
+        crtpParamWriteBroadcastRequest<float> request(group, id, value.valueFloat);
+        sendPacket((const uint8_t*)&request, sizeof(request));
+        break;
+      }
+  }
+  // m_paramValues[id] = value;
+}

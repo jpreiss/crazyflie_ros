@@ -553,6 +553,13 @@ public:
     pub->publish(msg);
   }
 
+  const Crazyflie::ParamTocEntry* getParamTocEntry(
+    const std::string& group,
+    const std::string& name) const
+  {
+    return m_cf.getParamTocEntry(group, name);
+  }
+
 private:
   Crazyflie m_cf;
   std::string m_tf_prefix;
@@ -862,6 +869,58 @@ public:
       m_phaseStart = std::chrono::system_clock::now();
   }
 
+  template<class T, class U>
+  void updateParam(uint8_t group, uint8_t id, Crazyflie::ParamType type, const std::string& ros_param) {
+      U value;
+      ros::param::get(ros_param, value);
+      m_cfbc.setParam<T>(group, id, type, (T)value);
+  }
+
+  void updateParams(
+    uint8_t group,
+    const std::vector<std::string>& params)
+  {
+    for (const auto& p : params) {
+      std::string ros_param = "/cfgroup" + std::to_string((int)group) + "/" + p;
+      size_t pos = p.find("/");
+      std::string g(p.begin(), p.begin() + pos);
+      std::string n(p.begin() + pos + 1, p.end());
+
+      // TODO: this assumes that all IDs are identically
+      //       should use byName lookup instead!
+      auto entry = m_cfs.front()->getParamTocEntry(g, n);
+      if (entry)
+      {
+        switch (entry->type) {
+          case Crazyflie::ParamTypeUint8:
+            updateParam<uint8_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeInt8:
+            updateParam<int8_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeUint16:
+            updateParam<uint16_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeInt16:
+            updateParam<int16_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeUint32:
+            updateParam<uint32_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeInt32:
+            updateParam<int32_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeFloat:
+            updateParam<float, float>(group, entry->id, entry->type, ros_param);
+            break;
+        }
+      }
+      else {
+        ROS_ERROR("Could not find param %s/%s", g.c_str(), n.c_str());
+      }
+    }
+  }
+
 private:
 
   void publishRigidBody(const std::string& name, uint8_t id, std::vector<stateExternalBringup> &states)
@@ -1105,6 +1164,7 @@ public:
     m_serviceStartCannedTrajectory = nh.advertiseService("start_canned_trajectory", &CrazyflieServer::startCannedTrajectory, this);
 
     m_serviceNextPhase = nh.advertiseService("next_phase", &CrazyflieServer::nextPhase, this);
+    m_serviceUpdateParams = nh.advertiseService("update_params", &CrazyflieServer::updateParams, this);
 
     m_pubPointCloud = nh.advertise<sensor_msgs::PointCloud>("pointCloud", 1);
   }
@@ -1431,13 +1491,13 @@ public:
           std::cout << latency.name << ": " << latency.secs * 1000 << " ms" << std::endl;
         }
         std::cout << "Total " << totalLatency * 1000 << " ms" << std::endl;
-        // if (latencyCount % 100 == 0) {
+        // // if (latencyCount % 100 == 0) {
           std::cout << "Avg " << latencyCount << std::endl;
           for (size_t i = 0; i < latencyTotal.size(); ++i) {
             std::cout << latencyTotal[i] / latencyCount * 1000.0 << ",";
           }
           std::cout << std::endl;
-        // }
+        // // }
       }
 
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
@@ -1586,6 +1646,22 @@ private:
     return true;
   }
 
+  bool updateParams(
+    crazyflie_driver::UpdateParams::Request& req,
+    crazyflie_driver::UpdateParams::Response& res)
+  {
+    ROS_INFO("UpdateParams!");
+
+    for (size_t i = 0; i < 5; ++i) {
+      for (auto& group : m_groups) {
+        group->updateParams(req.group, req.params);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
+    }
+
+    return true;
+  }
+
 //
   void readMarkerConfigurations(
     std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations)
@@ -1667,6 +1743,7 @@ private:
   ros::ServiceServer m_serviceGoHome;
   ros::ServiceServer m_serviceStartCannedTrajectory;
   ros::ServiceServer m_serviceNextPhase;
+  ros::ServiceServer m_serviceUpdateParams;
 
   ros::Publisher m_pubPointCloud;
   // tf::TransformBroadcaster m_br;

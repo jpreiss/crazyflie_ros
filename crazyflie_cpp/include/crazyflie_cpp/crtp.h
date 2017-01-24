@@ -185,6 +185,29 @@ struct crtpParamValueResponse
 } __attribute__((packed));
 CHECKSIZE_RESPONSE(crtpParamValueResponse)
 
+template <class T>
+struct crtpParamWriteBroadcastRequest
+{
+  crtpParamWriteBroadcastRequest(
+    uint8_t group,
+    uint8_t id,
+    const T& value)
+    : header(2, 3)
+    , command(1)
+    , group(group)
+    , id(id)
+    , value(value)
+    {
+    }
+
+    const crtp header;
+    const uint8_t command;
+    const uint8_t group;
+    const uint8_t id;
+    const T value;
+} __attribute__((packed));
+CHECKSIZE(crtpParamWriteBroadcastRequest<double>) // largest kind of param
+
 // Port 3 (Commander)
 
 struct crtpSetpointRequest
