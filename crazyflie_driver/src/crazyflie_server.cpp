@@ -655,44 +655,10 @@ public:
     return m_radio;
   }
 
-/*
   void runInteractiveObject(std::vector<stateExternalBringup> &states)
   {
-    auto const position = m_pClient->GetSegmentGlobalTranslation(
-      m_interactiveObject, m_interactiveObject);
-
-    if (position.Result != ViconDataStreamSDK::CPP::Result::Success) {
-      ROS_INFO("Interactive object GetSegmentGlobalTranslation failed");
-      return;
-    }
-
-    if (position.Occluded) {
-      // ROS_INFO("Interactive object is occluded");
-      return;
-    }
-
-    // this is kind of a hack -- make sure the interactive object
-    // is not very close to the floor. this is an extra measure to avoid
-    // fitting the interactive object to idle Crazyflies on the floor.
-    // obviously this only works if the interactive object is expected
-    // to be elevated above the floor all the time.
-    if (position.Translation[2] < 100) {
-      ROS_INFO("Interactive object is too close to floor");
-      return;
-    }
-
-    // only publish the interactive object if all of its markers are visible.
-    // this avoids the issue of Vicon Tracker fitting the interactive object
-    // to other markers in the scene (i.e. Crazyflies)
-    // when the interactive object is not actually in the scene at all.
-    // (this will print its own ROS_INFO error messages on failure)
-    bool const allVisible = viconObjectAllMarkersVisible(*m_pClient, m_interactiveObject);
-    if (allVisible) {
-      // TODO get 0xFF from packetdef.h???
-      publishViconObject(m_interactiveObject, 0xFF, states);
-    }
+    publishRigidBody(m_interactiveObject, 0xFF, states);
   }
-  */
 
   void runFast()
   {
@@ -700,9 +666,9 @@ public:
 
     std::vector<stateExternalBringup> states;
 
-    // if (!m_interactiveObject.empty()) {
-    //   runInteractiveObject(states);
-    // }
+    if (!m_interactiveObject.empty()) {
+      runInteractiveObject(states);
+    }
 
     if (m_useMotionCaptureObjectTracking) {
       for (auto cf : m_cfs) {
@@ -1151,6 +1117,7 @@ public:
     , m_serviceGoHome()
     , m_serviceStartCannedTrajectory()
     , m_serviceNextPhase()
+    , m_lastInteractiveObjectPosition(-10, -10, 1)
   {
     ros::NodeHandle nh;
     nh.setCallbackQueue(&m_queue);
@@ -1167,6 +1134,8 @@ public:
     m_serviceUpdateParams = nh.advertiseService("update_params", &CrazyflieServer::updateParams, this);
 
     m_pubPointCloud = nh.advertise<sensor_msgs::PointCloud>("pointCloud", 1);
+
+    m_subscribeVirtualInteractiveObject = nh.subscribe("virtual_interactive_object", 1, &CrazyflieServer::virtualInteractiveObjectCallback, this);
   }
 
   ~CrazyflieServer()
@@ -1174,6 +1143,14 @@ public:
     for (CrazyflieGroup* group : m_groups) {
       delete group;
     }
+  }
+
+  void virtualInteractiveObjectCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
+  {
+    m_lastInteractiveObjectPosition = Eigen::Vector3f(
+      msg->pose.position.x,
+      msg->pose.position.y,
+      msg->pose.position.z);
   }
 
   void run()
@@ -1442,10 +1419,20 @@ public:
         if (logClouds) {
           pointCloudLogger.log(markers);
         }
-      } else {
+      } 
+
+      if (useMotionCaptureObjectTracking || !interactiveObject.empty()) {
         // get mocap rigid bodies
         mocapObjects.clear();
         mocap->getObjects(mocapObjects);
+        if (interactiveObject == "virtual") {
+          Eigen::Quaternionf quat(0, 0, 0, 1);
+          mocapObjects.push_back(
+            libmotioncapture::Object(
+              interactiveObject,
+              m_lastInteractiveObjectPosition,
+              quat));
+        }
       }
 
       auto startRunGroups = std::chrono::high_resolution_clock::now();
@@ -1749,6 +1736,9 @@ private:
   // tf::TransformBroadcaster m_br;
 
   std::vector<CrazyflieGroup*> m_groups;
+
+  ros::Subscriber m_subscribeVirtualInteractiveObject;
+  Eigen::Vector3f m_lastInteractiveObjectPosition;
 
 private:
   // We have two callback queues
