@@ -671,6 +671,18 @@ public:
   void sendPacketDropTest(
     uint64_t seq);
 
+  template<class T>
+  void setParam(
+    uint8_t group,
+    uint8_t id,
+    Crazyflie::ParamType type,
+    const T& value)
+  {
+    Crazyflie::ParamValue v;
+    memcpy(&v, &value, sizeof(value));
+    setParam(group, id, type, v);
+  }
+
 protected:
   void sendPacket(
     const uint8_t* data,
@@ -679,6 +691,12 @@ protected:
   void send2Packets(
     const uint8_t* data,
     uint32_t length);
+
+  void setParam(
+    uint8_t group,
+    uint8_t id,
+    Crazyflie::ParamType type,
+    const Crazyflie::ParamValue& value);
 
 private:
   Crazyradio* m_radio;

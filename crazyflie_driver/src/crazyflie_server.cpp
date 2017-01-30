@@ -41,8 +41,16 @@
 #include <signal.h>
 #include <csignal> // or C++ style alternative
 
-// VICON
-#include "vicon_sdk/Client.h"
+// Motion Capture
+#ifdef ENABLE_VICON
+#include "libmotioncapture/vicon.h"
+#endif
+#ifdef ENABLE_OPTITRACK
+#include "libmotioncapture/optitrack.h"
+#endif
+#ifdef ENABLE_PHASESPACE
+#include "libmotioncapture/phasespace.h"
+#endif
 
 // Object tracker
 #include <libobjecttracker/object_tracker.h>
@@ -112,6 +120,7 @@ public:
 static ROSLogger rosLogger;
 
 // TODO this is incredibly dumb, fix it
+/*
 std::mutex viconClientMutex;
 
 static bool viconObjectAllMarkersVisible(
@@ -145,6 +154,7 @@ static bool viconObjectAllMarkersVisible(
   }
   return ok;
 }
+*/
 
 class CrazyflieROS
 {
@@ -543,6 +553,13 @@ public:
     pub->publish(msg);
   }
 
+  const Crazyflie::ParamTocEntry* getParamTocEntry(
+    const std::string& group,
+    const std::string& name) const
+  {
+    return m_cf.getParamTocEntry(group, name);
+  }
+
 private:
   Crazyflie m_cf;
   std::string m_tf_prefix;
@@ -585,12 +602,12 @@ public:
   CrazyflieGroup(
     const std::vector<libobjecttracker::DynamicsConfiguration>& dynamicsConfigurations,
     const std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations,
-    ViconDataStreamSDK::CPP::Client* pClient,
     pcl::PointCloud<pcl::PointXYZ>::Ptr pMarkers,
+    std::vector<libmotioncapture::Object>* pMocapObjects,
     int radio,
     int channel,
     const std::string broadcastAddress,
-    bool useViconTracker,
+    bool useMotionCaptureObjectTracking,
     const std::vector<crazyflie_driver::LogBlock>& logBlocks,
     std::string interactiveObject,
     bool writeCSVs
@@ -598,12 +615,12 @@ public:
     : m_cfs()
     , m_tracker(nullptr)
     , m_radio(radio)
-    , m_pClient(pClient)
     , m_pMarkers(pMarkers)
+    , m_pMocapObjects(pMocapObjects)
     , m_slowQueue()
     , m_cfbc("radio://" + std::to_string(radio) + "/" + std::to_string(channel) + "/2M/" + broadcastAddress)
     , m_isEmergency(false)
-    , m_useViconTracker(useViconTracker)
+    , m_useMotionCaptureObjectTracking(useMotionCaptureObjectTracking)
     , m_br()
     , m_interactiveObject(interactiveObject)
     , m_outputCSVs()
@@ -640,39 +657,7 @@ public:
 
   void runInteractiveObject(std::vector<stateExternalBringup> &states)
   {
-    auto const position = m_pClient->GetSegmentGlobalTranslation(
-      m_interactiveObject, m_interactiveObject);
-
-    if (position.Result != ViconDataStreamSDK::CPP::Result::Success) {
-      ROS_INFO("Interactive object GetSegmentGlobalTranslation failed");
-      return;
-    }
-
-    if (position.Occluded) {
-      // ROS_INFO("Interactive object is occluded");
-      return;
-    }
-
-    // this is kind of a hack -- make sure the interactive object
-    // is not very close to the floor. this is an extra measure to avoid
-    // fitting the interactive object to idle Crazyflies on the floor.
-    // obviously this only works if the interactive object is expected
-    // to be elevated above the floor all the time.
-    if (position.Translation[2] < 100) {
-      ROS_INFO("Interactive object is too close to floor");
-      return;
-    }
-
-    // only publish the interactive object if all of its markers are visible.
-    // this avoids the issue of Vicon Tracker fitting the interactive object
-    // to other markers in the scene (i.e. Crazyflies)
-    // when the interactive object is not actually in the scene at all.
-    // (this will print its own ROS_INFO error messages on failure)
-    bool const allVisible = viconObjectAllMarkersVisible(*m_pClient, m_interactiveObject);
-    if (allVisible) {
-      // TODO get 0xFF from packetdef.h???
-      publishViconObject(m_interactiveObject, 0xFF, states);
-    }
+    publishRigidBody(m_interactiveObject, 0xFF, states);
   }
 
   void runFast()
@@ -685,9 +670,9 @@ public:
       runInteractiveObject(states);
     }
 
-    if (m_useViconTracker) {
+    if (m_useMotionCaptureObjectTracking) {
       for (auto cf : m_cfs) {
-        publishViconObject(cf->frame(), cf->id(), states);
+        publishRigidBody(cf->frame(), cf->id(), states);
       }
     } else {
       // run object tracker
@@ -850,45 +835,99 @@ public:
       m_phaseStart = std::chrono::system_clock::now();
   }
 
-private:
-  void publishViconObject(const std::string& name, uint8_t id, std::vector<stateExternalBringup> &states)
+  template<class T, class U>
+  void updateParam(uint8_t group, uint8_t id, Crazyflie::ParamType type, const std::string& ros_param) {
+      U value;
+      ros::param::get(ros_param, value);
+      m_cfbc.setParam<T>(group, id, type, (T)value);
+  }
+
+  void updateParams(
+    uint8_t group,
+    const std::vector<std::string>& params)
   {
-    using namespace ViconDataStreamSDK::CPP;
+    for (const auto& p : params) {
+      std::string ros_param = "/cfgroup" + std::to_string((int)group) + "/" + p;
+      size_t pos = p.find("/");
+      std::string g(p.begin(), p.begin() + pos);
+      std::string n(p.begin() + pos + 1, p.end());
 
-    Output_GetSegmentGlobalTranslation translation = m_pClient->GetSegmentGlobalTranslation(name, name);
-    Output_GetSegmentGlobalRotationQuaternion quaternion = m_pClient->GetSegmentGlobalRotationQuaternion(name, name);
-
-    if (   translation.Result == Result::Success
-        && quaternion.Result == Result::Success
-        && !translation.Occluded
-        && !quaternion.Occluded) {
-
-      states.resize(states.size() + 1);
-      states.back().id = id;
-      states.back().x = translation.Translation[0] / 1000.0;
-      states.back().y = translation.Translation[1] / 1000.0;
-      states.back().z = translation.Translation[2] / 1000.0;
-      states.back().q0 = quaternion.Rotation[0];
-      states.back().q1 = quaternion.Rotation[1];
-      states.back().q2 = quaternion.Rotation[2];
-      states.back().q3 = quaternion.Rotation[3];
-
-      tf::Transform transform;
-      transform.setOrigin(tf::Vector3(
-        translation.Translation[0] / 1000.0,
-        translation.Translation[1] / 1000.0,
-        translation.Translation[2] / 1000.0));
-      tf::Quaternion q(
-        quaternion.Rotation[0],
-        quaternion.Rotation[1],
-        quaternion.Rotation[2],
-        quaternion.Rotation[3]);
-      transform.setRotation(q);
-      m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", name));
-    } else {
-      ROS_WARN("No updated pose for Vicon object %s", name.c_str());
+      // TODO: this assumes that all IDs are identically
+      //       should use byName lookup instead!
+      auto entry = m_cfs.front()->getParamTocEntry(g, n);
+      if (entry)
+      {
+        switch (entry->type) {
+          case Crazyflie::ParamTypeUint8:
+            updateParam<uint8_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeInt8:
+            updateParam<int8_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeUint16:
+            updateParam<uint16_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeInt16:
+            updateParam<int16_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeUint32:
+            updateParam<uint32_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeInt32:
+            updateParam<int32_t, int>(group, entry->id, entry->type, ros_param);
+            break;
+          case Crazyflie::ParamTypeFloat:
+            updateParam<float, float>(group, entry->id, entry->type, ros_param);
+            break;
+        }
+      }
+      else {
+        ROS_ERROR("Could not find param %s/%s", g.c_str(), n.c_str());
+      }
     }
   }
+
+private:
+
+  void publishRigidBody(const std::string& name, uint8_t id, std::vector<stateExternalBringup> &states)
+  {
+    bool found = false;
+    for (const auto& rigidBody : *m_pMocapObjects) {
+      if (rigidBody.name() == name) {
+
+        states.resize(states.size() + 1);
+        states.back().id = id;
+        states.back().x = rigidBody.position().x();
+        states.back().y = rigidBody.position().y();
+        states.back().z = rigidBody.position().z();
+        states.back().q0 = rigidBody.rotation().x();
+        states.back().q1 = rigidBody.rotation().y();
+        states.back().q2 = rigidBody.rotation().z();
+        states.back().q3 = rigidBody.rotation().w();
+
+        tf::Transform transform;
+        transform.setOrigin(tf::Vector3(
+          states.back().x,
+          states.back().y,
+          states.back().z));
+        tf::Quaternion q(
+          states.back().q0,
+          states.back().q1,
+          states.back().q2,
+          states.back().q3);
+        transform.setRotation(q);
+        m_br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", name));
+        found = true;
+        break;
+      }
+
+    }
+
+    if (!found) {
+      ROS_WARN("No updated pose for motion capture object %s", name.c_str());
+    }
+  }
+
 
   void readObjects(
     std::vector<libobjecttracker::Object>& objects,
@@ -1050,12 +1089,13 @@ private:
   std::string m_interactiveObject;
   libobjecttracker::ObjectTracker* m_tracker;
   int m_radio;
-  ViconDataStreamSDK::CPP::Client* m_pClient;
+  // ViconDataStreamSDK::CPP::Client* m_pClient;
   pcl::PointCloud<pcl::PointXYZ>::Ptr m_pMarkers;
+  std::vector<libmotioncapture::Object>* m_pMocapObjects;
   ros::CallbackQueue m_slowQueue;
   CrazyflieBroadcaster m_cfbc;
   bool m_isEmergency;
-  bool m_useViconTracker;
+  bool m_useMotionCaptureObjectTracking;
   tf::TransformBroadcaster m_br;
   latency m_latency;
   std::vector<std::ofstream> m_outputCSVs;
@@ -1077,6 +1117,7 @@ public:
     , m_serviceGoHome()
     , m_serviceStartCannedTrajectory()
     , m_serviceNextPhase()
+    , m_lastInteractiveObjectPosition(-10, -10, 1)
   {
     ros::NodeHandle nh;
     nh.setCallbackQueue(&m_queue);
@@ -1090,8 +1131,11 @@ public:
     m_serviceStartCannedTrajectory = nh.advertiseService("start_canned_trajectory", &CrazyflieServer::startCannedTrajectory, this);
 
     m_serviceNextPhase = nh.advertiseService("next_phase", &CrazyflieServer::nextPhase, this);
+    m_serviceUpdateParams = nh.advertiseService("update_params", &CrazyflieServer::updateParams, this);
 
     m_pubPointCloud = nh.advertise<sensor_msgs::PointCloud>("pointCloud", 1);
+
+    m_subscribeVirtualInteractiveObject = nh.subscribe("virtual_interactive_object", 1, &CrazyflieServer::virtualInteractiveObjectCallback, this);
   }
 
   ~CrazyflieServer()
@@ -1099,6 +1143,14 @@ public:
     for (CrazyflieGroup* group : m_groups) {
       delete group;
     }
+  }
+
+  void virtualInteractiveObjectCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
+  {
+    m_lastInteractiveObjectPosition = Eigen::Vector3f(
+      msg->pose.position.x,
+      msg->pose.position.y,
+      msg->pose.position.z);
   }
 
   void run()
@@ -1136,22 +1188,24 @@ public:
     readDynamicsConfigurations(dynamicsConfigurations);
     readChannels(channels);
 
-    std::string hostName;
     std::string broadcastAddress;
-    bool useViconTracker;
+    bool useMotionCaptureObjectTracking;
     std::string logFilePath;
     std::string interactiveObject;
     bool printLatency;
     bool writeCSVs;
+    std::string motionCaptureType;
 
     ros::NodeHandle nl("~");
-    nl.getParam("host_name", hostName);
-    nl.getParam("use_vicon_tracker", useViconTracker);
+    std::string objectTrackingType;
+    nl.getParam("object_tracking_type", objectTrackingType);
+    useMotionCaptureObjectTracking = (objectTrackingType == "motionCapture");
     nl.getParam("broadcast_address", broadcastAddress);
     nl.param<std::string>("save_point_clouds", logFilePath, "");
     nl.param<std::string>("interactive_object", interactiveObject, "");
     nl.getParam("print_latency", printLatency);
     nl.getParam("write_csvs", writeCSVs);
+    nl.param<std::string>("motion_capture_type", motionCaptureType, "vicon");
 
     // tilde-expansion
     wordexp_t wordexp_result;
@@ -1188,12 +1242,49 @@ public:
       ROS_ERROR("Cardinality of genericLogTopics and genericLogTopicFrequencies does not match!");
     }
 
-    using namespace ViconDataStreamSDK::CPP;
-
     // Make a new client
-    Client client;
+    libmotioncapture::MotionCapture* mocap = nullptr;
+    if (false)
+    {
+    }
+#ifdef ENABLE_VICON
+    else if (motionCaptureType == "vicon")
+    {
+      std::string hostName;
+      nl.getParam("vicon_host_name", hostName);
+      mocap = new libmotioncapture::MotionCaptureVicon(hostName,
+        /*enableObjects*/useMotionCaptureObjectTracking || !interactiveObject.empty(),
+        /*enablePointcloud*/ !useMotionCaptureObjectTracking);
+    }
+#endif
+#ifdef ENABLE_OPTITRACK
+    else if (motionCaptureType == "optitrack")
+    {
+      std::string localIP;
+      std::string serverIP;
+      nl.getParam("optitrack_local_ip", localIP);
+      nl.getParam("optitrack_server_ip", serverIP);
+      mocap = new libmotioncapture::MotionCaptureOptitrack(localIP, serverIP);
+    }
+#endif
+#ifdef ENABLE_PHASESPACE
+    else if (motionCaptureType == "phasespace")
+    {
+      std::string ip;
+      int numMarkers;
+      nl.getParam("phasespace_ip", ip);
+      nl.getParam("phasespace_num_markers", numMarkers);
+      std::map<size_t, std::pair<int, int> > cfs;
+      cfs[231] = std::make_pair<int, int>(10, 11);
+      mocap = new libmotioncapture::MotionCapturePhasespace(ip, numMarkers, cfs);
+    }
+#endif
+    else {
+      throw std::runtime_error("Unknown motion capture type!");
+    }
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr markers(new pcl::PointCloud<pcl::PointXYZ>);
+    std::vector<libmotioncapture::Object> mocapObjects;
 
     // Create all groups in parallel and launch threads
     {
@@ -1208,12 +1299,13 @@ public:
               return new CrazyflieGroup(
                 dynamicsConfigurations,
                 markerConfigurations,
-                &client,
+                // &client,
                 markers,
+                &mocapObjects,
                 radio,
                 channel,
                 broadcastAddress,
-                useViconTracker,
+                useMotionCaptureObjectTracking,
                 logBlocks,
                 interactiveObject,
                 writeCSVs);
@@ -1239,38 +1331,15 @@ public:
     ROS_INFO("Started %lu threads", threads.size());
 
     // Connect to a server
-    ROS_INFO("Connecting to %s ...", hostName.c_str());
-    while (ros::ok() && !client.IsConnected().Connected) {
-      // Direct connection
-      bool ok = (client.Connect(hostName).Result == Result::Success);
-      if(!ok) {
-        ROS_WARN("Connect failed...");
-      }
-      ros::spinOnce();
-    }
-
-    // Configure vicon
-    if (useViconTracker) {
-      client.EnableSegmentData();
-    } else {
-      client.EnableUnlabeledMarkerData();
-      if (!interactiveObject.empty()) {
-        client.EnableMarkerData();
-        client.EnableSegmentData();
-      }
-    }
-
-    // This is the lowest latency option
-    client.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ServerPush);
-
-    // Set the global up axis
-    client.SetAxisMapping(Direction::Forward,
-                          Direction::Left,
-                          Direction::Up); // Z-up
-
-    // Discover the version number
-    Output_GetVersion version = client.GetVersion();
-    ROS_INFO("VICON Version: %d.%d.%d", version.Major, version.Minor, version.Point);
+    // ROS_INFO("Connecting to %s ...", hostName.c_str());
+    // while (ros::ok() && !client.IsConnected().Connected) {
+    //   // Direct connection
+    //   bool ok = (client.Connect(hostName).Result == Result::Success);
+    //   if(!ok) {
+    //     ROS_WARN("Connect failed...");
+    //   }
+    //   ros::spinOnce();
+    // }
 
     // setup messages
     sensor_msgs::PointCloud msgPointCloud;
@@ -1287,41 +1356,41 @@ public:
 
     std::vector<double> latencyTotal(6 + 3 * 2, 0.0);
     uint32_t latencyCount = 0;
+    std::vector<libmotioncapture::LatencyInfo> mocapLatency;
 
     while (ros::ok() && !m_isEmergency) {
       // Get a frame
-      while (client.GetFrame().Result != Result::Success) {
-      }
+      mocap->waitForNextFrame();
+
       latencies.clear();
 
       auto startIteration = std::chrono::high_resolution_clock::now();
       double totalLatency = 0;
 
       // Get the latency
-      float viconLatency = client.GetLatencyTotal().Total;
+      mocap->getLatency(mocapLatency);
+      float viconLatency = 0;
+      for (const auto& item : mocapLatency) {
+        viconLatency += item.value();
+      }
       if (viconLatency > 0.035) {
         std::stringstream sstr;
         sstr << "VICON Latency high: " << viconLatency << " s." << std::endl;
-        size_t latencyCount = client.GetLatencySampleCount().Count;
-        for(size_t i = 0; i < latencyCount; ++i) {
-          std::string sampleName  = client.GetLatencySampleName(i).Name;
-          double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
-          sstr << "  Latency: " << sampleName << ": " << sampleValue << " s." << std::endl;
+        for (const auto& item : mocapLatency) {
+          sstr << "  Latency: " << item.name() << ": " << item.value() << " s." << std::endl;
         }
-
         ROS_WARN("%s", sstr.str().c_str());
       }
 
       if (printLatency) {
-        size_t latencyCount = client.GetLatencySampleCount().Count;
-        for(size_t i = 0; i < latencyCount; ++i) {
-          std::string sampleName  = client.GetLatencySampleName(i).Name;
-          double      sampleValue = client.GetLatencySampleValue(sampleName).Value;
-          latencies.push_back({sampleName, sampleValue});
-          latencyTotal[i] += sampleValue;
-          totalLatency += sampleValue;
-          latencyTotal.back() += sampleValue;
+        size_t i = 0;
+        for (const auto& item : mocapLatency) {
+          latencies.push_back({item.name(), item.value()});
+          latencyTotal[i] += item.value();
+          totalLatency += item.value();
+          latencyTotal.back() += item.value();
         }
+        ++i;
       }
 
       // size_t latencyCount = client.GetLatencySampleCount().Count;
@@ -1333,30 +1402,36 @@ public:
       // }
 
       // Get the unlabeled markers and create point cloud
-      if (!useViconTracker) {
-        size_t count = client.GetUnlabeledMarkerCount().MarkerCount;
-        markers->clear();
+      if (!useMotionCaptureObjectTracking) {
+        mocap->getPointCloud(markers);
 
         msgPointCloud.header.seq += 1;
         msgPointCloud.header.stamp = ros::Time::now();
-        msgPointCloud.points.resize(count);
-
-        for(size_t i = 0; i < count; ++i) {
-          Output_GetUnlabeledMarkerGlobalTranslation translation =
-            client.GetUnlabeledMarkerGlobalTranslation(i);
-          markers->push_back(pcl::PointXYZ(
-            translation.Translation[0] / 1000.0,
-            translation.Translation[1] / 1000.0,
-            translation.Translation[2] / 1000.0));
-
-          msgPointCloud.points[i].x = translation.Translation[0] / 1000.0;
-          msgPointCloud.points[i].y = translation.Translation[1] / 1000.0;
-          msgPointCloud.points[i].z = translation.Translation[2] / 1000.0;
+        msgPointCloud.points.resize(markers->size());
+        for (size_t i = 0; i < markers->size(); ++i) {
+          const pcl::PointXYZ& point = markers->at(i);
+          msgPointCloud.points[i].x = point.x;
+          msgPointCloud.points[i].y = point.y;
+          msgPointCloud.points[i].z = point.z;
         }
         m_pubPointCloud.publish(msgPointCloud);
 
         if (logClouds) {
           pointCloudLogger.log(markers);
+        }
+      } 
+
+      if (useMotionCaptureObjectTracking || !interactiveObject.empty()) {
+        // get mocap rigid bodies
+        mocapObjects.clear();
+        mocap->getObjects(mocapObjects);
+        if (interactiveObject == "virtual") {
+          Eigen::Quaternionf quat(0, 0, 0, 1);
+          mocapObjects.push_back(
+            libmotioncapture::Object(
+              interactiveObject,
+              m_lastInteractiveObjectPosition,
+              quat));
         }
       }
 
@@ -1403,13 +1478,13 @@ public:
           std::cout << latency.name << ": " << latency.secs * 1000 << " ms" << std::endl;
         }
         std::cout << "Total " << totalLatency * 1000 << " ms" << std::endl;
-        // if (latencyCount % 100 == 0) {
+        // // if (latencyCount % 100 == 0) {
           std::cout << "Avg " << latencyCount << std::endl;
           for (size_t i = 0; i < latencyTotal.size(); ++i) {
             std::cout << latencyTotal[i] / latencyCount * 1000.0 << ",";
           }
           std::cout << std::endl;
-        // }
+        // // }
       }
 
       // ROS_INFO("Latency: %f s", elapsedSeconds.count());
@@ -1558,6 +1633,22 @@ private:
     return true;
   }
 
+  bool updateParams(
+    crazyflie_driver::UpdateParams::Request& req,
+    crazyflie_driver::UpdateParams::Response& res)
+  {
+    ROS_INFO("UpdateParams!");
+
+    for (size_t i = 0; i < 5; ++i) {
+      for (auto& group : m_groups) {
+        group->updateParams(req.group, req.params);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
+    }
+
+    return true;
+  }
+
 //
   void readMarkerConfigurations(
     std::vector<libobjecttracker::MarkerConfiguration>& markerConfigurations)
@@ -1639,11 +1730,15 @@ private:
   ros::ServiceServer m_serviceGoHome;
   ros::ServiceServer m_serviceStartCannedTrajectory;
   ros::ServiceServer m_serviceNextPhase;
+  ros::ServiceServer m_serviceUpdateParams;
 
   ros::Publisher m_pubPointCloud;
   // tf::TransformBroadcaster m_br;
 
   std::vector<CrazyflieGroup*> m_groups;
+
+  ros::Subscriber m_subscribeVirtualInteractiveObject;
+  Eigen::Vector3f m_lastInteractiveObjectPosition;
 
 private:
   // We have two callback queues

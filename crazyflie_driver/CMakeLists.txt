@@ -10,14 +10,13 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   crazyflie_cpp
   libobjecttracker
+  libmotioncapture
   tf_conversions
 )
 
 # Enable C++11
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 #SET(CMAKE_CXX_COMPILER             "gcc-4.9")
-
-set(VICON_SDK_DIR ../externalDependencies/vicon_sdk/)
 
 # SET(CMAKE_BUILD_TYPE "Debug")
 
@@ -100,14 +99,23 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
   # ${libobjecttracker_INCLUDE_DIRS}
   ../externalDependencies/libobjecttracker/include
-  ${VICON_SDK_DIR}/include
   ## YOU HAVE TO CHANGE THIS TO REACH THE CRAZYFLIE FIRMWARE ON YOUR MACHINE
   ../../../../crazyflie-firmware/src/modules/interface/
 )
 
 link_directories(
-  ${VICON_SDK_DIR}/lib64
+  ${LIBMOTIONCAPTURE_LINK_DIR}
 )
+
+if (ENABLE_VICON)
+  add_definitions(-DENABLE_VICON)
+endif()
+if (ENABLE_OPTITRACK)
+  add_definitions(-DENABLE_OPTITRACK)
+endif()
+if (ENABLE_PHASESPACE)
+  add_definitions(-DENABLE_PHASESPACE)
+endif()
 
 # message(${CMAKE_BINARY_DIR}/crazyflie_ros/externalDependencies/libobjecttracker)
 
@@ -127,7 +135,6 @@ target_link_libraries(crazyflie_server
   ${catkin_LIBRARIES}
   # ${libobjecttracker_LIBRARIES}
   # ${libobjecttracker_LIBRARIES}
-  ViconDataStreamSDK_CPP
 )
 
 ## Declare a cpp executable
