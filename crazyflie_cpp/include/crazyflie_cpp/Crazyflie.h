@@ -177,6 +177,11 @@ public:
     m_linkQualityCallback = cb;
   }
 
+  void setConsoleCallback(
+    std::function<void(const char*)> cb) {
+    m_consoleCallback = cb;
+  }
+
   void trajectoryReset();
   void trajectoryAdd(
     float duration,
@@ -360,6 +365,7 @@ private:
 
   std::function<void(const crtpPlatformRSSIAck*)> m_emptyAckCallback;
   std::function<void(float)> m_linkQualityCallback;
+  std::function<void(const char*)> m_consoleCallback;
 
   uint16_t m_lastTrajectoryId;
 

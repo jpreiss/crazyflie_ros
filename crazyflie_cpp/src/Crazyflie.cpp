@@ -48,6 +48,7 @@ Crazyflie::Crazyflie(
   , m_paramValues()
   , m_emptyAckCallback(nullptr)
   , m_linkQualityCallback(nullptr)
+  , m_consoleCallback(nullptr)
   , m_lastTrajectoryId(0)
   , m_logger(logger)
 {
@@ -739,8 +740,12 @@ void Crazyflie::handleAck(
   if (crtpConsoleResponse::match(result)) {
     if (result.size > 0) {
       crtpConsoleResponse* r = (crtpConsoleResponse*)result.data;
-      // std::cout << r->text << std::endl;
+      if (m_consoleCallback) {
+        m_consoleCallback(r->text);
+      }
     }
+      // std::cout << r->text << std::endl;
+    // }
     // ROS_INFO("Console: %s", r->text);
   }
   else if (crtpLogGetInfoResponse::match(result)) {
