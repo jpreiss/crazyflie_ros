@@ -547,11 +547,13 @@ CHECKSIZE(crtpTrajectoryAddRequest)
 struct crtpTrajectoryStartRequest
 {
   crtpTrajectoryStartRequest(
-    uint8_t group)
+    uint8_t group,
+    bool reversed)
     : header(14, 1)
     , command(COMMAND_START_POLY)
     {
       data.group = group;
+      data.reversed = reversed;
     }
 
     const crtp header;

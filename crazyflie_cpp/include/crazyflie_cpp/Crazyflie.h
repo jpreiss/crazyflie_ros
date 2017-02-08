@@ -648,7 +648,8 @@ public:
     const std::string& link_uri);
 
   void trajectoryStart(
-    uint8_t group);
+    uint8_t group,
+    bool reversed);
 
   void takeoff(
     uint8_t group,

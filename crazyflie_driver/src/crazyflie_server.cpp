@@ -714,8 +714,8 @@ public:
             std::chrono::duration<double> tDuration = stamp - m_phaseStart;
             double t = tDuration.count();
             auto rpy = q.toRotationMatrix().eulerAngles(0, 1, 2);
-            m_outputCSVs[i] << t << "," << states.back().x << "," << states.back().y << "," << states.back().z
-                                 << "," << rpy(0) << "," << rpy(1) << "," << rpy(2) << "\n";
+            *m_outputCSVs[i] << t << "," << states.back().x << "," << states.back().y << "," << states.back().z
+                                  << "," << rpy(0) << "," << rpy(1) << "," << rpy(2) << "\n";
           }
         } else {
           std::chrono::duration<double> elapsedSeconds = stamp - m_tracker->objects()[i].lastValidTime();
@@ -789,10 +789,11 @@ public:
   }
 
   void startTrajectory(
-    uint8_t group)
+    uint8_t group,
+    bool reversed)
   {
     // for (size_t i = 0; i < 10; ++i) {
-      m_cfbc.trajectoryStart(group);
+      m_cfbc.trajectoryStart(group, reversed);
       // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     // }
   }
@@ -826,7 +827,7 @@ public:
   void nextPhase()
   {
       for (size_t i = 0; i < m_outputCSVs.size(); ++i) {
-        auto& file = m_outputCSVs[i];
+        auto& file = *m_outputCSVs[i];
         file.close();
         file.open("cf" + std::to_string(m_cfs[i]->id()) + "_phase" + std::to_string(m_phase + 1) + ".csv");
         file << "t,x,y,z,roll,pitch,yaw\n";
@@ -1098,7 +1099,7 @@ private:
   bool m_useMotionCaptureObjectTracking;
   tf::TransformBroadcaster m_br;
   latency m_latency;
-  std::vector<std::ofstream> m_outputCSVs;
+  std::vector<std::unique_ptr<std::ofstream>> m_outputCSVs;
   int m_phase;
   std::chrono::high_resolution_clock::time_point m_phaseStart;
 };
@@ -1111,6 +1112,7 @@ public:
     : m_isEmergency(false)
     , m_serviceEmergency()
     , m_serviceStartTrajectory()
+    , m_serviceStartTrajectoryReversed()
     , m_serviceTakeoff()
     , m_serviceLand()
     , m_serviceStartEllipse()
@@ -1124,6 +1126,7 @@ public:
 
     m_serviceEmergency = nh.advertiseService("emergency", &CrazyflieServer::emergency, this);
     m_serviceStartTrajectory = nh.advertiseService("start_trajectory", &CrazyflieServer::startTrajectory, this);
+    m_serviceStartTrajectoryReversed = nh.advertiseService("start_trajectory_reversed", &CrazyflieServer::startTrajectoryReversed, this);
     m_serviceTakeoff = nh.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
     m_serviceLand = nh.advertiseService("land", &CrazyflieServer::land, this);
     m_serviceStartEllipse = nh.advertiseService("start_ellipse", &CrazyflieServer::startEllipse, this);
@@ -1565,7 +1568,23 @@ private:
 
     for (size_t i = 0; i < 15; ++i) {
       for (auto& group : m_groups) {
-        group->startTrajectory(req.group);
+        group->startTrajectory(req.group, false); // false -> not reversed
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
+    }
+
+    return true;
+  }
+
+  bool startTrajectoryReversed(
+    crazyflie_driver::StartTrajectory::Request& req,
+    crazyflie_driver::StartTrajectory::Response& res)
+  {
+    ROS_INFO("Start trajectory!");
+
+    for (size_t i = 0; i < 5; ++i) {
+      for (auto& group : m_groups) {
+        group->startTrajectory(req.group, true); // true -> reversed
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -1724,6 +1743,7 @@ private:
   bool m_isEmergency;
   ros::ServiceServer m_serviceEmergency;
   ros::ServiceServer m_serviceStartTrajectory;
+  ros::ServiceServer m_serviceStartTrajectoryReversed;
   ros::ServiceServer m_serviceTakeoff;
   ros::ServiceServer m_serviceLand;
   ros::ServiceServer m_serviceStartEllipse;
