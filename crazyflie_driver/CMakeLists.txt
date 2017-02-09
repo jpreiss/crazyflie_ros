@@ -49,6 +49,7 @@ add_service_files(
   StartCannedTrajectory.srv
   StartEllipse.srv
   StartTrajectory.srv
+  StartTrajectoryReversed.srv
   Takeoff.srv
   UpdateParams.srv
   UploadTrajectory.srv
