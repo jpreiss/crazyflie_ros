@@ -894,7 +894,8 @@ private:
   {
     bool found = false;
     for (const auto& rigidBody : *m_pMocapObjects) {
-      if (rigidBody.name() == name) {
+      if (   rigidBody.name() == name
+          && !rigidBody.occluded()) {
 
         states.resize(states.size() + 1);
         states.back().id = id;
@@ -1120,6 +1121,8 @@ public:
     , m_serviceStartCannedTrajectory()
     , m_serviceNextPhase()
     , m_lastInteractiveObjectPosition(-10, -10, 1)
+    , m_broadcastingNumRepeats(15)
+    , m_broadcastingDelayBetweenRepeatsMs(1)
   {
     ros::NodeHandle nh;
     nh.setCallbackQueue(&m_queue);
@@ -1209,6 +1212,9 @@ public:
     nl.getParam("print_latency", printLatency);
     nl.getParam("write_csvs", writeCSVs);
     nl.param<std::string>("motion_capture_type", motionCaptureType, "vicon");
+
+    nl.param<int>("broadcasting_num_repeats", m_broadcastingNumRepeats, 15);
+    nl.param<int>("broadcasting_delay_between_repeats_ms", m_broadcastingDelayBetweenRepeatsMs, 1);
 
     // tilde-expansion
     wordexp_t wordexp_result;
@@ -1534,11 +1540,11 @@ private:
   {
     ROS_INFO("Takeoff!");
 
-    for (size_t i = 0; i < 15; ++i) {
+    for (size_t i = 0; i < m_broadcastingNumRepeats; ++i) {
       for (auto& group : m_groups) {
         group->takeoff(req.group, req.height, req.time_from_start.toSec() * 1000);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(m_broadcastingDelayBetweenRepeatsMs));
     }
 
     return true;
@@ -1550,11 +1556,11 @@ private:
   {
     ROS_INFO("Land!");
 
-    for (size_t i = 0; i < 15; ++i) {
+    for (size_t i = 0; i < m_broadcastingNumRepeats; ++i) {
       for (auto& group : m_groups) {
         group->land(req.group, req.height, req.time_from_start.toSec() * 1000);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(m_broadcastingDelayBetweenRepeatsMs));
     }
 
     return true;
@@ -1566,7 +1572,7 @@ private:
   {
     ROS_INFO("Start trajectory!");
 
-    for (size_t i = 0; i < 15; ++i) {
+    for (size_t i = 0; i < m_broadcastingNumRepeats; ++i) {
       for (auto& group : m_groups) {
         group->startTrajectory(req.group, false); // false -> not reversed
       }
@@ -1586,7 +1592,7 @@ private:
       for (auto& group : m_groups) {
         group->startTrajectory(req.group, true); // true -> reversed
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(m_broadcastingDelayBetweenRepeatsMs));
     }
 
     return true;
@@ -1598,11 +1604,11 @@ private:
   {
     ROS_INFO("Start Ellipse!");
 
-    for (size_t i = 0; i < 15; ++i) {
+    for (size_t i = 0; i < m_broadcastingNumRepeats; ++i) {
       for (auto& group : m_groups) {
         group->startEllipse(req.group);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(m_broadcastingDelayBetweenRepeatsMs));
     }
 
     return true;
@@ -1614,11 +1620,11 @@ private:
   {
     ROS_INFO("Go Home!");
 
-    for (size_t i = 0; i < 15; ++i) {
+    for (size_t i = 0; i < m_broadcastingNumRepeats; ++i) {
       for (auto& group : m_groups) {
         group->goHome(req.group);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(m_broadcastingDelayBetweenRepeatsMs));
     }
 
     return true;
@@ -1630,11 +1636,11 @@ private:
   {
     ROS_INFO("StartCannedTrajectory!");
 
-    for (size_t i = 0; i < 15; ++i) {
+    for (size_t i = 0; i < m_broadcastingNumRepeats; ++i) {
       for (auto& group : m_groups) {
         group->startCannedTrajectory(req.group, req.trajectory, req.timescale);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(m_broadcastingDelayBetweenRepeatsMs));
     }
 
     return true;
@@ -1658,11 +1664,11 @@ private:
   {
     ROS_INFO("UpdateParams!");
 
-    for (size_t i = 0; i < 5; ++i) {
+    for (size_t i = 0; i < m_broadcastingNumRepeats; ++i) {
       for (auto& group : m_groups) {
         group->updateParams(req.group, req.params);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(3));
+      std::this_thread::sleep_for(std::chrono::milliseconds(m_broadcastingDelayBetweenRepeatsMs));
     }
 
     return true;
@@ -1759,6 +1765,9 @@ private:
 
   ros::Subscriber m_subscribeVirtualInteractiveObject;
   Eigen::Vector3f m_lastInteractiveObjectPosition;
+
+  int m_broadcastingNumRepeats;
+  int m_broadcastingDelayBetweenRepeatsMs;
 
 private:
   // We have two callback queues
