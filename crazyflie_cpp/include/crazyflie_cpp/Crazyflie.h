@@ -95,6 +95,11 @@ public:
     std::string name;
   };
 
+  enum BootloaderTarget {
+    TargetSTM32 = 0xFF,
+    TargetNRF51 = 0xFE,
+  };
+
 public:
   Crazyflie(
     const std::string& link_uri,
@@ -111,12 +116,21 @@ public:
   void sendPing();
 
   void reboot();
-  void rebootToBootloader();
+  // returns new address
+  uint64_t rebootToBootloader();
   void sysoff();
   void trySysOff();
   void alloff();
   void syson();
   float vbat();
+
+  void writeFlash(
+    BootloaderTarget target,
+    const std::vector<uint8_t>& data);
+  void readFlash(
+    BootloaderTarget target,
+    size_t size,
+    std::vector<uint8_t>& data);
 
   void setChannel(uint8_t channel);
 
@@ -279,12 +293,14 @@ private:
   }
 
   void handleRequests(
+    bool crtpMode = true,
     float baseTime = 2.0,
     float timePerRequest = 0.2,
     int additionalSleep = 0);
 
   void handleBatchAck(
-    const Crazyradio::Ack& result);
+    const Crazyradio::Ack& result,
+    bool crtpMode);
 
   template<typename R>
   const R* getRequestResult(size_t index) const {

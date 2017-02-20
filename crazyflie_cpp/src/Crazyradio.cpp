@@ -179,6 +179,7 @@ void Crazyradio::sendPacket(
         throw std::runtime_error(libusb_error_name(status));
     }
 
+
     result.size = transferred - 1;
 
     ++m_numPacketsSent;
