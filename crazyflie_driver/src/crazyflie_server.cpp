@@ -704,8 +704,10 @@ public:
           states.back().q3 = q.w();
 
           tf::Transform tftransform;
-          Eigen::Affine3d transformd = transform.cast<double>();
-          tf::transformEigenToTF(transformd, tftransform);
+          tftransform.setOrigin(tf::Vector3(translation.x(), translation.y(), translation.z()));
+          tftransform.setRotation(tf::Quaternion(q.x(), q.y(), q.z(), q.w()));
+          // Eigen::Affine3d transformd = transform.cast<double>();
+          // tf::transformEigenToTF(transformd, tftransform);
           // tftransform.setOrigin(tf::Vector3(translation.x(), translation.y(), translation.z()));
           // tf::Quaternion tfq(q.x(), q.y(), q.z(), q.w());
           m_br.sendTransform(tf::StampedTransform(tftransform, ros::Time::now(), "world", m_cfs[i]->frame()));
