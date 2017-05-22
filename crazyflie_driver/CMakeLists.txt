@@ -147,6 +147,8 @@ add_dependencies(crazyflie_add
   crazyflie_driver_generate_messages_cpp
 )
 
+add_dependencies(crazyflie_add ${${PROJECT_NAME}}_EXPORTED_TARGETS ${catkin_EXPORTED_TARGETS})
+
 target_link_libraries(crazyflie_add
   ${catkin_LIBRARIES}
 )
