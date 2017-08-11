@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Crazyradio.h"
+
 // Header
 struct crtp
 {
@@ -170,6 +172,7 @@ struct crtpSetpointRequest
   float yawrate;
   uint16_t thrust;
 }  __attribute__((packed));
+
 
 // Port 4 (Memory access)
 
@@ -382,6 +385,33 @@ struct crtpExternalPositionUpdate
   float z;
 }  __attribute__((packed));
 
+
+// Port 0x07 (Generic Setpoint)
+
+struct crtpFullyActuatedSetpointRequest
+{
+  crtpFullyActuatedSetpointRequest(
+    float x, float y, float z,
+    float vx, float vy, float vz,
+    float ax, float ay, float az,
+    float qx, float qy, float qz, float qw,
+    float rollRate, float pitchRate, float yawRate);
+  const crtp header;
+  uint8_t type;
+  int16_t x;
+  int16_t y;
+  int16_t z;
+  int16_t vx;
+  int16_t vy;
+  int16_t vz;
+  int16_t ax;
+  int16_t ay;
+  int16_t az;
+  int32_t quat; // compressed quaternion, xyzw
+  int16_t omegax;
+  int16_t omegay;
+  int16_t omegaz;
+} __attribute__((packed));
 
 
 // Port 13 (Platform)

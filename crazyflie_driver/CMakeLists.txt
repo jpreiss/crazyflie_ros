@@ -40,12 +40,14 @@ add_message_files(
   FILES
   LogBlock.msg
   GenericLogData.msg
+  FullyActuatedState.msg
 )
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
    std_msgs
+   geometry_msgs
 )
 
 ###################################

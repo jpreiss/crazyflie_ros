@@ -25,5 +25,10 @@
     <param name="enable_logging_magnetic_field" value="$(arg enable_logging_magnetic_field)" />
     <param name="enable_logging_pressure" value="$(arg enable_logging_pressure)" />
     <param name="enable_logging_battery" value="$(arg enable_logging_battery)" />
+    <rosparam>
+      genericLogTopics: ["tilthex"]
+      genericLogTopicFrequencies: [100]
+      genericLogTopic_tilthex_Variables: ["tilthexDebug.faset"]
+    </rosparam>
   </node>
 </launch>
