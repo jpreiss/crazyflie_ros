@@ -5,13 +5,14 @@ import tf
 from math import sin, cos, pi
 from geometry_msgs.msg import Twist, Pose
 from std_srvs.srv import Empty
-from crazyflie_driver.msg import FullyActuatedState
+from crazyflie_driver.msg import FullyActuatedState, GenericLogData
 from crazyflie_driver.srv import UpdateParams
+from thrust_vis import ThrustVis
 
 if __name__ == '__main__':
+
     rospy.init_node('crazyflie_demo_fully_actuated', anonymous=True)
     p = rospy.Publisher('crazyflie/cmd_fully_actuated', FullyActuatedState)
-
 
 
     rospy.loginfo("waiting for update_params service")
@@ -67,7 +68,7 @@ if __name__ == '__main__':
 
 
     #raw_input("press enter to oscillate in place")
-    THETA_RAD = 0.5
+    THETA_RAD = 0.0
     PERIOD_SEC = 2 * pi
     RAMP_SEC = 2.0
     HOLD_SEC = 3.0
@@ -81,6 +82,21 @@ if __name__ == '__main__':
 
     t0 = rospy.get_rostime()
 
+    vis = ThrustVis()
+    thrusts_normalized = [0 for i in range(6)]
+
+    def thrusts_callback(pwms):
+        global thrusts_normalized
+        global acc
+        OMEGA2_MAX = 4.3865e6;
+        def conv(pwm):
+            omega2 = (pwm/0.4 - 3683) ** 2
+            return omega2 / OMEGA2_MAX
+        thrusts_normalized = [conv(p) for p in pwms.values[0:6]]
+
+    rospy.Subscriber('crazyflie/tilthexPWM', GenericLogData, thrusts_callback)
+
+
     while not rospy.is_shutdown():
         t = (rospy.get_rostime() - t0).to_sec()
 
@@ -90,14 +106,18 @@ if __name__ == '__main__':
             theta_scale = THETA_RAD
         elif t > T_END:
             theta_scale = 0
-            break
+            #break
         elif t > T_RAMPDOWN:
             theta_scale = ((RAMP_SEC - (t - T_RAMPDOWN)) / RAMP_SEC) * THETA_RAD
         else:
             assert(False)
 
-        th = theta_scale * sin(time_scale * t)
-        dth = theta_scale * time_scale * cos(time_scale * t)
+        th = 0 * theta_scale * sin(time_scale * t)
+        dth = 0 * theta_scale * time_scale * cos(time_scale * t)
+
+        x =                      sin(time_scale * t)
+        dx =       time_scale *  cos(time_scale * t)
+        ddx = time_scale ** 2 * -sin(time_scale * t)
 
         q = tf.transformations.quaternion_from_euler(0, 0, th, 'rzyx')
         state.pose.orientation.x = q[0]
@@ -106,7 +126,26 @@ if __name__ == '__main__':
         state.pose.orientation.w = q[3]
         state.twist.angular.x = dth
 
+        state.pose.position.x = 0
+        state.pose.position.y = x
+        state.pose.position.z = 0
+        state.twist.linear.x = 0
+        state.twist.linear.y = dx
+        state.twist.linear.z = 0
+        state.acc.x = 0
+        state.acc.y = ddx
+        state.acc.z = 0
+
+        if ddx > 0.5:
+            print "ACC LEFT"
+        elif ddx < -0.5:
+            print "ACC RIGHT"
+        else:
+            print "---"
+
         p.publish(state)
+
+        vis.set_thrusts(thrusts_normalized)
         r.sleep()
 
 

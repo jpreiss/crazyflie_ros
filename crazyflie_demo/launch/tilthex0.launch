@@ -12,11 +12,6 @@
     <include file="$(find crazyflie_driver)/launch/crazyflie_add.launch">
       <arg name="uri" value="$(arg uri)" />
       <arg name="tf_prefix" value="crazyflie" />
-      <rosparam>
-        genericLogTopics: ["tilthex"]
-        genericLogTopicFrequencies: [100]
-        genericLogTopic_tilthex_Variables: ["acc.x"]
-      </rosparam>
     </include>
 
     <node name="joy" pkg="joy" type="joy_node" output="screen" >

@@ -214,7 +214,7 @@ private:
   void cmdFullyActuatedSetpoint(
     const crazyflie_driver::FullyActuatedState::ConstPtr& msg)
   {
-    ROS_INFO("got a fully actuated setpoint");
+    //ROS_INFO("got a fully actuated setpoint");
     if (!m_isEmergency) {
       float x = msg->pose.position.x;
       float y = msg->pose.position.y;
@@ -241,7 +241,7 @@ private:
         qx, qy, qz, qw,
         rollRate, pitchRate, yawRate);
       m_sentSetpoint = true;
-      ROS_INFO("set a fully actuated setpoint");
+      //ROS_INFO("set a fully actuated setpoint");
     }
   }
 

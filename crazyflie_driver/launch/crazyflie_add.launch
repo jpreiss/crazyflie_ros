@@ -26,9 +26,9 @@
     <param name="enable_logging_pressure" value="$(arg enable_logging_pressure)" />
     <param name="enable_logging_battery" value="$(arg enable_logging_battery)" />
     <rosparam>
-      genericLogTopics: ["tilthex"]
-      genericLogTopicFrequencies: [100]
-      genericLogTopic_tilthex_Variables: ["tilthexDebug.faset"]
+      genericLogTopics: ["tilthexPWM"]
+      genericLogTopicFrequencies: [10]
+      genericLogTopic_tilthexPWM_Variables: ["tilthexPWM.p0", "tilthexPWM.p1", "tilthexPWM.p2", "tilthexPWM.p3", "tilthexPWM.p4", "tilthexPWM.p5", "tilthexRdiag.x", "tilthexRdiag.y", "tilthexRdiag.z"]
     </rosparam>
   </node>
 </launch>
