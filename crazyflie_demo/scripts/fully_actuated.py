@@ -13,7 +13,8 @@ if __name__ == '__main__':
 
     rospy.init_node('crazyflie_demo_fully_actuated', anonymous=True)
     pub_setpoint = rospy.Publisher('crazyflie/cmd_fully_actuated', FullyActuatedState)
-    pub_vicon = rospy.Publisher('crazyflie/external_position', PointStamped)
+    #pub_vicon = rospy.Publisher('crazyflie/external_position', PointStamped)
+    pub_pose = rospy.Publisher('crazyflie/external_pose', Pose)
 
     rospy.loginfo("waiting for update_params service")
     rospy.wait_for_service('crazyflie/update_params')
@@ -36,10 +37,19 @@ if __name__ == '__main__':
     # takeoff_srv = rospy.ServiceProxy('takeoff', Empty)
 
 
-    vicon_pos = PointStamped()
-    vicon_pos.point.x = 0
-    vicon_pos.point.y = 0
-    vicon_pos.point.z = 0
+    #vicon_pos = PointStamped()
+    #vicon_pos.point.x = 0
+    #vicon_pos.point.y = 0
+    #vicon_pos.point.z = 0
+
+    pose = Pose()
+    pose.position.x = 0
+    pose.position.y = 0
+    pose.position.z = 0
+    pose.orientation.x = 0
+    pose.orientation.y = 0
+    pose.orientation.z = 0
+    pose.orientation.w = 1
 
     state = FullyActuatedState()
 
@@ -72,8 +82,8 @@ if __name__ == '__main__':
 
 
     #raw_input("press enter to oscillate in place")
-    THETA_RAD = 0.0
-    PERIOD_SEC = 2 * pi
+    THETA_RAD = 3
+    PERIOD_SEC = 1
     RAMP_SEC = 2.0
     HOLD_SEC = 3.0
     RATE_HZ = 50
@@ -102,7 +112,15 @@ if __name__ == '__main__':
             return omega2 / OMEGA2_MAX
         thrusts_normalized = [conv(p) for p in pwms.values[0:6]]
 
+    def quat_callback(quat):
+        print "ext quat (xyzw): " + str(quat.values)
+
+    def ekf_pos_callback(pos):
+        print "ekf pos: ", pos.values[0:3], ", usec: ", pos.values[3]
+
     rospy.Subscriber('crazyflie/tilthexThrusts', GenericLogData, thrusts_callback)
+    rospy.Subscriber('crazyflie/ext_quat', GenericLogData, quat_callback)
+    rospy.Subscriber('crazyflie/ekf_pos', GenericLogData, ekf_pos_callback)
 
     while not rospy.is_shutdown():
         t = (rospy.get_rostime() - t0).to_sec()
@@ -112,7 +130,8 @@ if __name__ == '__main__':
         elif t < T_RAMPDOWN:
             theta_scale = THETA_RAD
         elif t > T_END:
-            theta_scale = 0
+            #theta_scale = 0
+            theta_scale = THETA_RAD
             #break
         elif t > T_RAMPDOWN:
             theta_scale = ((RAMP_SEC - (t - T_RAMPDOWN)) / RAMP_SEC) * THETA_RAD
@@ -122,17 +141,17 @@ if __name__ == '__main__':
         th = theta_scale * sin(time_scale * t)
         dth = theta_scale * time_scale * cos(time_scale * t)
 
-        x_scale = 0.3
+        x_scale = 0.2
         x =   x_scale *                    sin(time_scale * t)
         dx =  x_scale *      time_scale *  cos(time_scale * t)
         ddx = x_scale * time_scale ** 2 * -sin(time_scale * t)
 
-        q = tf.transformations.quaternion_from_euler(0, 0, th, 'rzyx')
+        q = tf.transformations.quaternion_from_euler(0, 0, 0, 'rzyx')
         state.pose.orientation.x = q[0]
         state.pose.orientation.y = q[1]
         state.pose.orientation.z = q[2]
         state.pose.orientation.w = q[3]
-        state.twist.angular.x = dth
+        state.twist.angular.x = 0
 
         state.pose.position.x = 0
         state.pose.position.y = 0
@@ -144,10 +163,21 @@ if __name__ == '__main__':
         state.acc.y = 0
         state.acc.z = 0
 
-        vicon_pos.point.x = x;
-        print "x =", vicon_pos.point.x
 
-        pub_vicon.publish(vicon_pos)
+        q = tf.transformations.quaternion_from_euler(th, 0, 0, 'rzyx')
+        pose.position.x = 0
+        pose.position.y = 0
+        pose.position.z = 0
+        pose.orientation.x = q[0]
+        pose.orientation.y = q[1]
+        pose.orientation.z = q[2]
+        pose.orientation.w = q[3]
+        print pose.orientation
+        #vicon_pos.point.x = 0.3 * x;
+        #print "x =", vicon_pos.point.x
+
+        #pub_vicon.publish(vicon_pos)
+        pub_pose.publish(pose)
         pub_setpoint.publish(state)
 
         vis.set_thrusts(thrusts_normalized)
