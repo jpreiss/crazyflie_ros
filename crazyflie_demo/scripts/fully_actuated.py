@@ -3,7 +3,7 @@
 import rospy
 import tf
 from math import sin, cos, pi
-from geometry_msgs.msg import Twist, Pose
+from geometry_msgs.msg import Twist, Pose, PointStamped
 from std_srvs.srv import Empty
 from crazyflie_driver.msg import FullyActuatedState, GenericLogData
 from crazyflie_driver.srv import UpdateParams
@@ -12,8 +12,8 @@ from thrust_vis import ThrustVis
 if __name__ == '__main__':
 
     rospy.init_node('crazyflie_demo_fully_actuated', anonymous=True)
-    p = rospy.Publisher('crazyflie/cmd_fully_actuated', FullyActuatedState)
-
+    pub_setpoint = rospy.Publisher('crazyflie/cmd_fully_actuated', FullyActuatedState)
+    pub_vicon = rospy.Publisher('crazyflie/external_position', PointStamped)
 
     rospy.loginfo("waiting for update_params service")
     rospy.wait_for_service('crazyflie/update_params')
@@ -36,6 +36,10 @@ if __name__ == '__main__':
     # takeoff_srv = rospy.ServiceProxy('takeoff', Empty)
 
 
+    vicon_pos = PointStamped()
+    vicon_pos.point.x = 0
+    vicon_pos.point.y = 0
+    vicon_pos.point.z = 0
 
     state = FullyActuatedState()
 
@@ -85,17 +89,20 @@ if __name__ == '__main__':
     vis = ThrustVis()
     thrusts_normalized = [0 for i in range(6)]
 
-    def thrusts_callback(pwms):
+    def thrusts_callback(thrusts):
+        global thrusts_normalized
+        OMEGA2_MAX = 4.3865e6;
+        thrusts_normalized = [w2 / OMEGA2_MAX for w2 in thrusts.values[0:6]]
+
+    def pwms_callback(pwms):
         global thrusts_normalized
         global acc
-        OMEGA2_MAX = 4.3865e6;
         def conv(pwm):
             omega2 = (pwm/0.4 - 3683) ** 2
             return omega2 / OMEGA2_MAX
         thrusts_normalized = [conv(p) for p in pwms.values[0:6]]
 
-    rospy.Subscriber('crazyflie/tilthexPWM', GenericLogData, thrusts_callback)
-
+    rospy.Subscriber('crazyflie/tilthexThrusts', GenericLogData, thrusts_callback)
 
     while not rospy.is_shutdown():
         t = (rospy.get_rostime() - t0).to_sec()
@@ -112,12 +119,13 @@ if __name__ == '__main__':
         else:
             assert(False)
 
-        th = 0 * theta_scale * sin(time_scale * t)
-        dth = 0 * theta_scale * time_scale * cos(time_scale * t)
+        th = theta_scale * sin(time_scale * t)
+        dth = theta_scale * time_scale * cos(time_scale * t)
 
-        x =                      sin(time_scale * t)
-        dx =       time_scale *  cos(time_scale * t)
-        ddx = time_scale ** 2 * -sin(time_scale * t)
+        x_scale = 0.3
+        x =   x_scale *                    sin(time_scale * t)
+        dx =  x_scale *      time_scale *  cos(time_scale * t)
+        ddx = x_scale * time_scale ** 2 * -sin(time_scale * t)
 
         q = tf.transformations.quaternion_from_euler(0, 0, th, 'rzyx')
         state.pose.orientation.x = q[0]
@@ -127,23 +135,20 @@ if __name__ == '__main__':
         state.twist.angular.x = dth
 
         state.pose.position.x = 0
-        state.pose.position.y = x
+        state.pose.position.y = 0
         state.pose.position.z = 0
         state.twist.linear.x = 0
-        state.twist.linear.y = dx
+        state.twist.linear.y = 0
         state.twist.linear.z = 0
         state.acc.x = 0
-        state.acc.y = ddx
+        state.acc.y = 0
         state.acc.z = 0
 
-        if ddx > 0.5:
-            print "ACC LEFT"
-        elif ddx < -0.5:
-            print "ACC RIGHT"
-        else:
-            print "---"
+        vicon_pos.point.x = x;
+        print "x =", vicon_pos.point.x
 
-        p.publish(state)
+        pub_vicon.publish(vicon_pos)
+        pub_setpoint.publish(state)
 
         vis.set_thrusts(thrusts_normalized)
         r.sleep()
