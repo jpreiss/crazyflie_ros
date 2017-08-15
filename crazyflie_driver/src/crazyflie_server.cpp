@@ -68,6 +68,7 @@ public:
     , m_subscribeCmdVel()
     , m_subscribeCmdFullyActuated()
     , m_subscribeExternalPosition()
+    , m_subscribeExternalPose()
     , m_pubImu()
     , m_pubTemp()
     , m_pubMag()
@@ -76,11 +77,13 @@ public:
     , m_pubRssi()
     , m_sentSetpoint(false)
     , m_sentExternalPosition(false)
+    , m_sentExternalPose(false)
   {
     ros::NodeHandle n;
     m_subscribeCmdVel = n.subscribe(tf_prefix + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
     m_subscribeCmdFullyActuated = n.subscribe(tf_prefix + "/cmd_fully_actuated", 1, &CrazyflieROS::cmdFullyActuatedSetpoint, this);
     m_subscribeExternalPosition = n.subscribe(tf_prefix + "/external_position", 1, &CrazyflieROS::positionMeasurementChanged, this);
+    m_subscribeExternalPose = n.subscribe(tf_prefix + "/external_pose", 1, &CrazyflieROS::poseMeasurementChanged, this);
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
 
     if (m_enable_logging_imu) {
@@ -252,6 +255,16 @@ private:
     m_sentExternalPosition = true;
   }
 
+  void poseMeasurementChanged(
+    const geometry_msgs::Pose::ConstPtr& msg)
+  {
+    m_cf.sendExternalPoseUpdate(
+      msg->position.x, msg->position.y, msg->position.z,
+      msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
+    m_sentExternalPose = true;
+  }
+
+
   void run()
   {
     // m_cf.reboot();
@@ -379,11 +392,12 @@ private:
 
     while(!m_isEmergency) {
       // make sure we ping often enough to stream data out
-      if (m_enableLogging && !m_sentSetpoint && !m_sentExternalPosition) {
+      if (m_enableLogging && !m_sentSetpoint && !m_sentExternalPosition && !m_sentExternalPose) {
         m_cf.sendPing();
       }
       m_sentSetpoint = false;
       m_sentExternalPosition = false;
+      m_sentExternalPose = false;
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
@@ -515,6 +529,7 @@ private:
   ros::Subscriber m_subscribeCmdVel;
   ros::Subscriber m_subscribeCmdFullyActuated;
   ros::Subscriber m_subscribeExternalPosition;
+  ros::Subscriber m_subscribeExternalPose;
   ros::Publisher m_pubImu;
   ros::Publisher m_pubTemp;
   ros::Publisher m_pubMag;
@@ -523,7 +538,7 @@ private:
   ros::Publisher m_pubRssi;
   std::vector<ros::Publisher> m_pubLogDataGeneric;
 
-  bool m_sentSetpoint, m_sentExternalPosition;
+  bool m_sentSetpoint, m_sentExternalPosition, m_sentExternalPose;
 
   std::thread m_thread;
 };
