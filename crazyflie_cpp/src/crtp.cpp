@@ -69,7 +69,7 @@ static inline int16_t name ## _float_to_fix16(float x) \
   float normalized = x / limit; \
   if (normalized > 1.0f) normalized = 1.0f; \
   if (normalized < -1.0f) normalized = -1.0f; \
-  return INT16_MAX * x; \
+  return INT16_MAX * normalized; \
 } \
 static inline float name ## _fix16_to_float(int16_t x) \
 { \
