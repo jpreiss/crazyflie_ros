@@ -1,0 +1,64 @@
+header: 
+  seq: 1982
+  stamp: 
+    secs: 1504471013
+    nsecs: 804820102
+  frame_id: crazyflie/base_link
+values: [250260.5, 320180.21875, 2958060.75, 427.421630859375, 130995.3828125, 3022278.75]
+---
+header: 
+  seq: 1983
+  stamp: 
+    secs: 1504471013
+    nsecs: 905493938
+  frame_id: crazyflie/base_link
+values: [228886.4375, 400845.3125, 2845727.75, 575.39208984375, 228927.921875, 2896090.0]
+---
+header: 
+  seq: 1984
+  stamp: 
+    secs: 1504471014
+    nsecs:   5223310
+  frame_id: crazyflie/base_link
+values: [229690.671875, 401359.8125, 2898396.0, 499.200439453125, 217859.265625, 2951026.0]
+---
+header: 
+  seq: 1985
+  stamp: 
+    secs: 1504471014
+    nsecs: 104077850
+  frame_id: crazyflie/base_link
+values: [241893.9375, 342302.8125, 2940435.0, 417.7208557128906, 153559.265625, 3000884.25]
+---
+header: 
+  seq: 1986
+  stamp: 
+    secs: 1504471014
+    nsecs: 202744726
+  frame_id: crazyflie/base_link
+values: [236118.109375, 370282.875, 2889697.25, 575.235107421875, 191933.421875, 2944485.75]
+---
+header: 
+  seq: 1987
+  stamp: 
+    secs: 1504471014
+    nsecs: 303201146
+  frame_id: crazyflie/base_link
+values: [243653.9375, 325117.125, 2960113.5, 560.0206298828125, 131018.3984375, 3026471.75]
+---
+header: 
+  seq: 1988
+  stamp: 
+    secs: 1504471014
+    nsecs: 403157782
+  frame_id: crazyflie/base_link
+values: [247599.265625, 313084.5, 2902047.25, 303.80609130859375, 133329.21875, 2967802.75]
+---
+header: 
+  seq: 1989
+  stamp: 
+    secs: 1504471014
+    nsecs: 503120912
+  frame_id: crazyflie/base_link
+values: [240867.65625, 353513.40625, 2908252.75, 520.83203125, 171534.5625, 2970173.25]
+---

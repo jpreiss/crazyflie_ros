@@ -1,0 +1,88 @@
+header: 
+  seq: 4224
+  stamp: 
+    secs: 1504483354
+    nsecs: 193042622
+  frame_id: crazyflie/base_link
+values: [4386499.0, 4386499.0, 3745479.75, 4386499.0, 4386498.0, 4386499.5]
+---
+header: 
+  seq: 4225
+  stamp: 
+    secs: 1504483354
+    nsecs: 292843372
+  frame_id: crazyflie/base_link
+values: [4386499.5, 4386499.0, 3672122.25, 4386499.0, 4386496.5, 4386499.5]
+---
+header: 
+  seq: 4226
+  stamp: 
+    secs: 1504483354
+    nsecs: 391738979
+  frame_id: crazyflie/base_link
+values: [4386500.0, 4386500.0, 3899767.75, 4386500.0, 4386500.0, 4386500.0]
+---
+header: 
+  seq: 4227
+  stamp: 
+    secs: 1504483354
+    nsecs: 492533081
+  frame_id: crazyflie/base_link
+values: [4386499.0, 4386498.5, 3803421.25, 4386498.5, 4386493.0, 4386499.5]
+---
+header: 
+  seq: 4228
+  stamp: 
+    secs: 1504483354
+    nsecs: 591799964
+  frame_id: crazyflie/base_link
+values: [4386499.0, 4386499.0, 3131295.5, 4386498.5, 4386487.5, 4386499.5]
+---
+header: 
+  seq: 4229
+  stamp: 
+    secs: 1504483354
+    nsecs: 691064193
+  frame_id: crazyflie/base_link
+values: [4386498.0, 4386499.0, 3125982.5, 4386498.5, 4386481.5, 4386499.0]
+---
+header: 
+  seq: 4230
+  stamp: 
+    secs: 1504483354
+    nsecs: 789932492
+  frame_id: crazyflie/base_link
+values: [4386500.0, 4386500.0, 4102203.75, 4386500.0, 4386499.5, 4386500.0]
+---
+header: 
+  seq: 4231
+  stamp: 
+    secs: 1504483354
+    nsecs: 889629178
+  frame_id: crazyflie/base_link
+values: [4386499.5, 4386500.0, 3926593.25, 4386499.5, 4386500.0, 4386499.5]
+---
+header: 
+  seq: 4232
+  stamp: 
+    secs: 1504483354
+    nsecs: 990257268
+  frame_id: crazyflie/base_link
+values: [4386499.5, 4386498.5, 3418305.75, 4386499.5, 4386498.0, 4386500.0]
+---
+header: 
+  seq: 4233
+  stamp: 
+    secs: 1504483355
+    nsecs:  89015218
+  frame_id: crazyflie/base_link
+values: [4386498.5, 4386500.0, 3107096.75, 4386498.0, 4386475.5, 4386498.5]
+---
+header: 
+  seq: 4234
+  stamp: 
+    secs: 1504483355
+    nsecs: 189661815
+  frame_id: crazyflie/base_link
+values: [4386494.5, 4386498.5, 3657253.5, 4386493.0, 4386444.0, 4386495.0]
+---

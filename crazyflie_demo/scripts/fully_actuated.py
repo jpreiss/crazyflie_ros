@@ -40,7 +40,7 @@ if __name__ == '__main__':
 	# rospy.loginfo("found takeoff service")
 	# takeoff_srv = rospy.ServiceProxy('takeoff', Empty)
 
-	THRUST_SCALE = 1.25
+	THRUST_SCALE = 1.25 # full battery: 1.25; empty battery: 1.50
 	rospy.set_param("crazyflie/tilthex_dynamics/k_thrust", 1.0/THRUST_SCALE * 1.6e-6)
 	rospy.set_param("crazyflie/tilthex_dynamics/k_drag", 1.0/THRUST_SCALE * 8.0e-8)
 	rospy.set_param("crazyflie/tilthex_dynamics/mass", 1.126)
@@ -71,25 +71,25 @@ if __name__ == '__main__':
 	pose.orientation.z = 0
 	pose.orientation.w = 1
 
-	state = FullyActuatedState()
+	setpoint = FullyActuatedState()
 
-	state.pose.position.x = 0
-	state.pose.position.y = 0
-	state.pose.position.z = 0
-	state.pose.orientation.x = 0
-	state.pose.orientation.y = 0
-	state.pose.orientation.z = 0
-	state.pose.orientation.w = 1
-	state.acc.x = 0
-	state.acc.y = 0
-	state.acc.z = 0
+	setpoint.pose.position.x = 0
+	setpoint.pose.position.y = 0
+	setpoint.pose.position.z = 0
+	setpoint.pose.orientation.x = 0
+	setpoint.pose.orientation.y = 0
+	setpoint.pose.orientation.z = 0
+	setpoint.pose.orientation.w = 1
+	setpoint.acc.x = 0
+	setpoint.acc.y = 0
+	setpoint.acc.z = 0
 
-	state.twist.linear.x = 0
-	state.twist.linear.y = 0
-	state.twist.linear.z = 0
-	state.twist.angular.x = 0
-	state.twist.angular.y = 0
-	state.twist.angular.z = 0
+	setpoint.twist.linear.x = 0
+	setpoint.twist.linear.y = 0
+	setpoint.twist.linear.z = 0
+	setpoint.twist.angular.x = 0
+	setpoint.twist.angular.y = 0
+	setpoint.twist.angular.z = 0
 
 	RATE = 50.0 #Hz
 	DT = 1.0 / RATE
@@ -224,25 +224,25 @@ if __name__ == '__main__':
 			# rollMsg.data = roll
 			# pub_roll.publish(rollMsg)
 			q = tf.transformations.quaternion_from_euler(0, 0, 0) #, 'rzyx')
-			state.pose.orientation.x = q[0]
-			state.pose.orientation.y = q[1]
-			state.pose.orientation.z = q[2]
-			state.pose.orientation.w = q[3]
-			state.twist.angular.x = 0
+			setpoint.pose.orientation.x = q[0]
+			setpoint.pose.orientation.y = q[1]
+			setpoint.pose.orientation.z = q[2]
+			setpoint.pose.orientation.w = q[3]
+			setpoint.twist.angular.x = 0
 
-			state.pose.position.x = hold_pos.x
-			state.pose.position.y = hold_pos.y + roll
-			# print(state.pose.position.y)
-			state.pose.position.z = hold_pos.z
-			state.twist.linear.x = 0
-			state.twist.linear.y = 0
-			state.twist.linear.z = 0
-			state.acc.x = 0
-			state.acc.y = 0
-			state.acc.z = 0
+			setpoint.pose.position.x = hold_pos.x
+			setpoint.pose.position.y = hold_pos.y + roll
+			# print(setpoint.pose.position.y)
+			setpoint.pose.position.z = hold_pos.z
+			setpoint.twist.linear.x = 0
+			setpoint.twist.linear.y = 0
+			setpoint.twist.linear.z = 0
+			setpoint.acc.x = 0
+			setpoint.acc.y = 0
+			setpoint.acc.z = 0
 
 			if running:
-				pub_setpoint.publish(state)
+				pub_setpoint.publish(setpoint)
 
 
 		#q = tf.transformations.quaternion_from_euler(th, 0, 0, 'rzyx')
