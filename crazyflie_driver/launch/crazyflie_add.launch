@@ -7,11 +7,11 @@
   <arg name="pitch_trim" default="0" />
   <arg name="enable_logging" default="True" />
   <arg name="use_ros_time" default="True" />
-  <arg name="enable_logging_imu" default="True" />
-  <arg name="enable_logging_temperature" default="True" />
-  <arg name="enable_logging_magnetic_field" default="True" />
-  <arg name="enable_logging_pressure" default="True" />
-  <arg name="enable_logging_battery" default="True" />
+  <arg name="enable_logging_imu" default="False" />
+  <arg name="enable_logging_temperature" default="False" />
+  <arg name="enable_logging_magnetic_field" default="False" />
+  <arg name="enable_logging_pressure" default="False" />
+  <arg name="enable_logging_battery" default="False" />
 
   <node pkg="crazyflie_driver" type="crazyflie_add" name="crazyflie_add" output="screen">
     <param name="uri" value="$(arg uri)" />
@@ -25,22 +25,37 @@
     <param name="enable_logging_magnetic_field" value="$(arg enable_logging_magnetic_field)" />
     <param name="enable_logging_pressure" value="$(arg enable_logging_pressure)" />
     <param name="enable_logging_battery" value="$(arg enable_logging_battery)" />
+    <rosparam>
+      genericLogTopics: ["ekf_pos"]
+      genericLogTopicFrequencies: [10]
+      genericLogTopic_ekf_pos_Variables: [ "ekf_pos.x", "ekf_pos.y", "ekf_pos.z", "ekf_pos.vicon_x", "ekf_pos.vicon_y", "ekf_pos.vicon_z"]
+    </rosparam>
     <!--
+    <rosparam>
+      genericLogTopics: ["ctrlDebug"]
+      genericLogTopicFrequencies: [10]
+      genericLogTopic_ctrlDebug_Variables: [ "ekf_pos.x", "ekf_pos.y", "ekf_pos.z", "ekf_pos.vicon_x", "ekf_pos.vicon_y", "ekf_pos.vicon_z"]
+    </rosparam>
     <rosparam>
       genericLogTopics: ["tilthexThrusts"]
       genericLogTopicFrequencies: [100]
       genericLogTopic_tilthexThrusts_Variables: [ "tilthexThrusts.t0", "tilthexThrusts.t1", "tilthexThrusts.t2", "tilthexThrusts.t3", "tilthexThrusts.t4", "tilthexThrusts.t5"]
     </rosparam>
     <rosparam>
+      genericLogTopics: ["tiltDbg"]
+      genericLogTopicFrequencies: [100]
+      genericLogTopic_tiltDbg_Variables: [ "tiltDbg.vicon", "tiltDbg.setpt", "tiltDbg.emerg", "tiltDbg.x_frac"]
+    </rosparam>
+    <rosparam>
       genericLogTopics: ["ext_quat"]
       genericLogTopicFrequencies: [10]
       genericLogTopic_ext_quat_Variables: ["ext_quat.x", "ext_quat.y", "ext_quat.z", "ext_quat.w"]
     </rosparam>
-    -->
     <rosparam>
       genericLogTopics: ["ekf_pos"]
       genericLogTopicFrequencies: [100]
       genericLogTopic_ekf_pos_Variables: ["ekf_pos.x", "ekf_pos.y", "ekf_pos.z", "ekf_pos.usec"]
     </rosparam>
+    -->
   </node>
 </launch>
