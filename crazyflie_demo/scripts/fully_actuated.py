@@ -16,7 +16,6 @@ if __name__ == '__main__':
 
 	rospy.init_node('crazyflie_demo_fully_actuated', anonymous=True)
 	pub_setpoint = rospy.Publisher('crazyflie/cmd_fully_actuated', FullyActuatedState)
-	pub_roll = rospy.Publisher('crazyflie/roll', Float32)
 	#pub_vicon = rospy.Publisher('crazyflie/external_position', PointStamped)
 	pub_pose = rospy.Publisher('crazyflie/external_pose', Pose)
 
@@ -40,14 +39,17 @@ if __name__ == '__main__':
 	# rospy.loginfo("found takeoff service")
 	# takeoff_srv = rospy.ServiceProxy('takeoff', Empty)
 
-	THRUST_SCALE = 1.25 # full battery: 1.25; empty battery: 1.50
+	THRUST_SCALE = 1.3 #1.375 # full battery: 1.25; empty battery: 1.50
 	rospy.set_param("crazyflie/tilthex_dynamics/k_thrust", 1.0/THRUST_SCALE * 1.6e-6)
 	rospy.set_param("crazyflie/tilthex_dynamics/k_drag", 1.0/THRUST_SCALE * 8.0e-8)
 	rospy.set_param("crazyflie/tilthex_dynamics/mass", 1.126)
-	rospy.set_param("crazyflie/tilthex_pid/att_kp", 60) # 80
-	rospy.set_param("crazyflie/tilthex_pid/att_kd", 15) # 20
-	rospy.set_param("crazyflie/tilthex_pid/pos_kp", 8)
-	rospy.set_param("crazyflie/tilthex_pid/pos_kd", 4)
+	rospy.set_param("crazyflie/tilthex_pid/att_kp", 150) # 80
+	rospy.set_param("crazyflie/tilthex_pid/att_kd", 50) # 20
+	rospy.set_param("crazyflie/tilthex_pid/pos_kp", 16)
+	rospy.set_param("crazyflie/tilthex_pid/pos_kd", 8)
+	rospy.set_param("crazyflie/tilthex_pid/pos_ki_xy", 1)
+	rospy.set_param("crazyflie/tilthex_pid/pos_ki_z", 5)
+	rospy.set_param("crazyflie/tilthex_pid/pos_satp", 0.4)
 	update_params_srv([
 		"tilthex_dynamics/k_thrust",
 		"tilthex_dynamics/k_drag",
@@ -55,7 +57,11 @@ if __name__ == '__main__':
 		"tilthex_pid/att_kp",
 		"tilthex_pid/att_kd",
 		"tilthex_pid/pos_kp",
-		"tilthex_pid/pos_kd"])
+		"tilthex_pid/pos_kd",
+		"tilthex_pid/pos_ki_xy",
+		"tilthex_pid/pos_ki_z",
+		"tilthex_pid/pos_satp"
+	])
 
 	#vicon_pos = PointStamped()
 	#vicon_pos.point.x = 0
@@ -91,21 +97,11 @@ if __name__ == '__main__':
 	setpoint.twist.angular.y = 0
 	setpoint.twist.angular.z = 0
 
-	RATE = 50.0 #Hz
-	DT = 1.0 / RATE
-	r = rospy.Rate(RATE)
-
-	#raw_input("press enter to take off")
-	takeoff_height = 0.75
-	takeoff_sec = 10
-	#takeoff_srv()
-
-
 	#raw_input("press enter to oscillate in place")
-	THETA_RAD = 0
-	PERIOD_SEC = 1
-	RAMP_SEC = 2.0
-	HOLD_SEC = 3.0
+	THETA_RAD = 3.16
+	PERIOD_SEC = 30
+	RAMP_SEC = 00.0
+	HOLD_SEC = 30.0
 	RATE_HZ = 250
 	T_RAMPDOWN = RAMP_SEC + HOLD_SEC
 	T_END = T_RAMPDOWN + RAMP_SEC
@@ -113,8 +109,6 @@ if __name__ == '__main__':
 
 	time_scale = (2 * pi) / PERIOD_SEC
 	r = rospy.Rate(RATE_HZ)
-
-	t0 = rospy.get_rostime()
 
 	# vis = ThrustVis()
 	thrusts_normalized = [0 for i in range(6)]
@@ -135,9 +129,6 @@ if __name__ == '__main__':
 		pose.orientation = xform.transform.rotation
 		pub_pose.publish(pose)
 		# r, p, y = tf.transformations.euler_from_quaternion([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
-		# rollMsg = Float32()
-		# rollMsg.data = r
-		# pub_roll.publish(rollMsg)
 		# print "vicon_init =", vicon_init
 		if not vicon_init:
 			hold_pos = copy.deepcopy(pose.position)
@@ -164,7 +155,7 @@ if __name__ == '__main__':
 
 	def ekf_pos_callback(pos):
 		global state
-		logdata.write("{},{},{}\n".format(rospy.get_rostime().to_sec(), state.pose.position.y, pos.values[1]))
+		logdata.write("{},{},{}\n".format(rospy.get_rostime().to_sec(), setpoint.pose.position.y, pos.values[1]))
 		#print "ekf pos: ", pos.values[0:3], ", usec: ", pos.values[3]
 		pass
 
@@ -172,22 +163,22 @@ if __name__ == '__main__':
 		# print ", ".join(str(x) for x in rpy.values[0:2])
 		pass
 
-	roll = 0
+	step = 0
 	running = False
 
 	def joy_changed_callback(joy):
 		# print(joy)
-		global roll
+		global step
 		global running
 		if joy.buttons[2] == 1: #blue
-			roll = 0.1
+			step = 0.2
 		if joy.buttons[0] == 1: # green
-			roll = 0.0
+			step = 0.0
 		if joy.buttons[7] == 1: # start
 			running = True
 		if joy.buttons[1] == 1: # red
 			running = False
-		# print("switched roll to {}".format(roll))
+		# print("switched step to {}".format(step))
 
 	rospy.Subscriber('crazyflie/tilthexThrusts', GenericLogData, thrusts_callback)
 	rospy.Subscriber('crazyflie/ext_quat', GenericLogData, quat_callback)
@@ -195,53 +186,60 @@ if __name__ == '__main__':
 	rospy.Subscriber('crazyflie/ekf_rpy', GenericLogData, ekf_rpy_callback)
 	rospy.Subscriber('crazyflie/joy', Joy, joy_changed_callback)
 
+	t0 = None
+
 	while not rospy.is_shutdown():
-		t = (rospy.get_rostime() - t0).to_sec()
 
-		if t < RAMP_SEC:
-			theta_scale = (t / RAMP_SEC) * THETA_RAD
-		elif t < T_RAMPDOWN:
-			theta_scale = THETA_RAD
-		elif t > T_END:
-			#theta_scale = 0
-			theta_scale = THETA_RAD
-			#break
-		elif t > T_RAMPDOWN:
-			theta_scale = ((RAMP_SEC - (t - T_RAMPDOWN)) / RAMP_SEC) * THETA_RAD
-		else:
-			assert(False)
+		if running:
+			if not t0:
+				t0 = rospy.get_rostime()
 
-		th = theta_scale * sin(time_scale * t)
-		dth = theta_scale * time_scale * cos(time_scale * t)
+			t = (rospy.get_rostime() - t0).to_sec() - 6
 
-		x_scale = 0.2
-		x =   x_scale *					sin(time_scale * t)
-		dx =  x_scale *	  time_scale *  cos(time_scale * t)
-		ddx = x_scale * time_scale ** 2 * -sin(time_scale * t)
+			if t < 0:
+				theta_scale = 0
+			elif t < RAMP_SEC:
+				theta_scale = (t / RAMP_SEC) * THETA_RAD
+			elif t < T_RAMPDOWN:
+				theta_scale = THETA_RAD
+			elif t > T_END:
+				theta_scale = 0
+			elif t >= T_RAMPDOWN:
+				theta_scale = ((RAMP_SEC - (t - T_RAMPDOWN)) / RAMP_SEC) * THETA_RAD
+			else:
+				assert(False)
 
-		if vicon_init:
-			# rollMsg = Float32()
-			# rollMsg.data = roll
-			# pub_roll.publish(rollMsg)
-			q = tf.transformations.quaternion_from_euler(0, 0, 0) #, 'rzyx')
-			setpoint.pose.orientation.x = q[0]
-			setpoint.pose.orientation.y = q[1]
-			setpoint.pose.orientation.z = q[2]
-			setpoint.pose.orientation.w = q[3]
-			setpoint.twist.angular.x = 0
+			th = theta_scale * sin(time_scale * t)
+			dth = theta_scale * time_scale * cos(time_scale * t)
 
-			setpoint.pose.position.x = hold_pos.x
-			setpoint.pose.position.y = hold_pos.y + roll
-			# print(setpoint.pose.position.y)
-			setpoint.pose.position.z = hold_pos.z
-			setpoint.twist.linear.x = 0
-			setpoint.twist.linear.y = 0
-			setpoint.twist.linear.z = 0
-			setpoint.acc.x = 0
-			setpoint.acc.y = 0
-			setpoint.acc.z = 0
+			# x_scale = 0.0
+			# x =   x_scale *					sin(time_scale * t)
+			# dx =  x_scale *	  time_scale *  cos(time_scale * t)
+			# ddx = x_scale * time_scale ** 2 * -sin(time_scale * t)
 
-			if running:
+			if vicon_init:
+				# stepMsg = Float32()
+				# stepMsg.data = step
+				# pub_step.publish(th)
+				q = tf.transformations.quaternion_from_euler(0, 0, th) #, 'rzyx')
+				setpoint.pose.orientation.x = q[0]
+				setpoint.pose.orientation.y = q[1]
+				setpoint.pose.orientation.z = q[2]
+				setpoint.pose.orientation.w = q[3]
+				setpoint.twist.angular.z = dth
+
+				setpoint.pose.position.x = hold_pos.x
+				setpoint.pose.position.y = hold_pos.y # + step
+				setpoint.pose.position.z = hold_pos.z
+				setpoint.twist.linear.x = 0
+				setpoint.twist.linear.y = 0
+				setpoint.twist.linear.z = 0
+				setpoint.acc.x = 0
+				setpoint.acc.y = 0
+				setpoint.acc.z = 0
+
+				#print(th)
+
 				pub_setpoint.publish(setpoint)
 
 
